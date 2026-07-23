@@ -1,0 +1,418 @@
+"use client";
+
+// ======================================================
+// REACT
+// ======================================================
+
+import {
+  ChangeEvent,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
+// ======================================================
+// SERVICE
+// ======================================================
+
+import RequestQueryService from "./requestQuery.service";
+
+// ======================================================
+// TYPES
+// ======================================================
+
+import {
+  RequestQuery,
+  CreateRequestQueryPayload,
+  UpdateRequestQueryPayload,
+  EMPTY_REQUEST_QUERY,
+} from "./requestQuery.types";
+
+// ======================================================
+// VALIDATION
+// ======================================================
+
+import {
+  validateRequestQuery,
+  RequestQueryValidationErrors,
+} from "./requestQuery.validation";
+
+// ======================================================
+// CONTEXT TYPE
+// ======================================================
+
+interface RequestQueryContextType {
+  loading: boolean;
+
+  requestQueries: RequestQuery[];
+
+  requestQuery: CreateRequestQueryPayload;
+
+  errors: RequestQueryValidationErrors;
+
+  selectedRequestQuery: RequestQuery | null;
+
+  setSelectedRequestQueryData: (requestQuery: RequestQuery) => void;
+
+  handleChange: (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => void;
+
+  resetForm: () => void;
+
+  addRequestQuery: () => Promise<boolean>;
+
+  getRequestQueries: () => Promise<void>;
+
+  getRequestQueryByGeneratedId: (
+    request_query_generated_id: string,
+  ) => Promise<void>;
+
+  updateRequestQuery: () => Promise<boolean>;
+
+  deleteRequestQuery: (request_query_generated_id: string) => Promise<boolean>;
+}
+
+// ======================================================
+// CONTEXT
+// ======================================================
+
+const RequestQueryContext = createContext<RequestQueryContextType | undefined>(
+  undefined,
+);
+
+// ======================================================
+// PROVIDER
+// ======================================================
+
+export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
+  // ======================================================
+  // LOADING
+  // ======================================================
+
+  const [loading, setLoading] = useState(false);
+
+  // ======================================================
+  // REQUEST QUERIES
+  // ======================================================
+
+  const [requestQueries, setRequestQueries] = useState<RequestQuery[]>([]);
+
+  // ======================================================
+  // REQUEST QUERY FORM
+  // ======================================================
+
+  const [requestQuery, setRequestQuery] =
+    useState<CreateRequestQueryPayload>(EMPTY_REQUEST_QUERY);
+
+  // ======================================================
+  // VALIDATION ERRORS
+  // ======================================================
+
+  const [errors, setErrors] = useState<RequestQueryValidationErrors>({});
+
+  // ======================================================
+  // SELECTED REQUEST QUERY
+  // ======================================================
+
+  const [selectedRequestQuery, setSelectedRequestQuery] =
+    useState<RequestQuery | null>(null);
+
+  // ======================================================
+  // HANDLE CHANGE
+  // ======================================================
+
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+
+    setRequestQuery((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (errors[name as keyof RequestQueryValidationErrors]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+  };
+
+  // ======================================================
+  // RESET FORM
+  // ======================================================
+
+  const resetForm = () => {
+    setRequestQuery(EMPTY_REQUEST_QUERY);
+
+    setErrors({});
+
+    setSelectedRequestQuery(null);
+  };
+
+  // ======================================================
+  // SET SELECTED REQUEST QUERY
+  // ======================================================
+
+  const setSelectedRequestQueryData = (selected: RequestQuery) => {
+    setSelectedRequestQuery(selected);
+
+    setRequestQuery({
+      name: selected.name,
+
+      email: selected.email,
+
+      phone_number: selected.phone_number,
+
+      query_title: selected.query_title,
+
+      query_description: selected.query_description,
+
+      screenshot_url: selected.screenshot_url ?? "",
+
+      assigned_to: selected.assigned_to ?? "",
+
+      resolution_note: selected.resolution_note ?? "",
+    });
+
+    setErrors({});
+  };
+  // ======================================================
+  // ADD REQUEST QUERY
+  // ======================================================
+
+  const addRequestQuery = async (): Promise<boolean> => {
+    const validationErrors = validateRequestQuery(requestQuery);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+
+      return false;
+    }
+
+    try {
+      setLoading(true);
+
+      await RequestQueryService.addRequestQuery(requestQuery);
+
+      await getRequestQueries();
+
+      resetForm();
+
+      return true;
+    } catch (error) {
+      console.error("Error adding request query:", error);
+
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // GET REQUEST QUERIES
+  // ======================================================
+
+  const getRequestQueries = async (): Promise<void> => {
+    try {
+      setLoading(true);
+
+      const response = await RequestQueryService.getRequestQueries();
+
+      setRequestQueries(response.data || []);
+    } catch (error) {
+      console.error("Error fetching request queries:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // GET REQUEST QUERY BY GENERATED ID
+  // ======================================================
+
+  const getRequestQueryByGeneratedId = async (
+    request_query_generated_id: string,
+  ): Promise<void> => {
+    try {
+      setLoading(true);
+
+      const response = await RequestQueryService.getRequestQueryByGeneratedId(
+        request_query_generated_id,
+      );
+
+      if (response.data) {
+        setSelectedRequestQuery(response.data);
+
+        setRequestQuery({
+          name: response.data.name,
+
+          email: response.data.email,
+
+          phone_number: response.data.phone_number,
+
+          query_title: response.data.query_title,
+
+          query_description: response.data.query_description,
+
+          screenshot_url: response.data.screenshot_url ?? "",
+
+          assigned_to: response.data.assigned_to ?? "",
+
+          resolution_note: response.data.resolution_note ?? "",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching request query:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // UPDATE REQUEST QUERY
+  // ======================================================
+
+  const updateRequestQuery = async (): Promise<boolean> => {
+    if (!selectedRequestQuery) {
+      return false;
+    }
+
+    const validationErrors = validateRequestQuery(requestQuery);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+
+      return false;
+    }
+
+    try {
+      setLoading(true);
+
+      const payload: UpdateRequestQueryPayload = {
+        ...requestQuery,
+      };
+
+      await RequestQueryService.updateRequestQuery(
+        selectedRequestQuery.request_query_generated_id!,
+        payload,
+      );
+
+      await getRequestQueries();
+
+      resetForm();
+
+      return true;
+    } catch (error) {
+      console.error("Error updating request query:", error);
+
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // DELETE REQUEST QUERY
+  // ======================================================
+
+  const deleteRequestQuery = async (
+    request_query_generated_id: string,
+  ): Promise<boolean> => {
+    try {
+      setLoading(true);
+
+      await RequestQueryService.deleteRequestQuery(request_query_generated_id);
+
+      setRequestQueries((prev) =>
+        prev.filter(
+          (request) =>
+            request.request_query_generated_id !== request_query_generated_id,
+        ),
+      );
+
+      if (
+        selectedRequestQuery?.request_query_generated_id ===
+        request_query_generated_id
+      ) {
+        resetForm();
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting request query:", error);
+
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }; // ======================================================
+  // INITIAL LOAD
+  // ======================================================
+
+  useEffect(() => {
+    getRequestQueries();
+  }, []);
+
+  // ======================================================
+  // CONTEXT VALUE
+  // ======================================================
+
+  const value: RequestQueryContextType = {
+    loading,
+
+    requestQueries,
+
+    requestQuery,
+
+    errors,
+
+    selectedRequestQuery,
+
+    setSelectedRequestQueryData,
+
+    handleChange,
+
+    resetForm,
+
+    addRequestQuery,
+
+    getRequestQueries,
+
+    getRequestQueryByGeneratedId,
+
+    updateRequestQuery,
+
+    deleteRequestQuery,
+  };
+
+  // ======================================================
+  // PROVIDER
+  // ======================================================
+
+  return (
+    <RequestQueryContext.Provider value={value}>
+      {children}
+    </RequestQueryContext.Provider>
+  );
+};
+
+// ======================================================
+// HOOK
+// ======================================================
+
+export const useRequestQuery = (): RequestQueryContextType => {
+  const context = useContext(RequestQueryContext);
+
+  if (!context) {
+    throw new Error(
+      "useRequestQuery must be used within a RequestQueryProvider",
+    );
+  }
+
+  return context;
+};

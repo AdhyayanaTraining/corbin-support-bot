@@ -1,0 +1,43 @@
+// ======================================================
+// WEBSITE USER
+// ======================================================
+
+export interface WebsiteUser {
+  registerd_employee_generated_id?: string;
+
+  name: string;
+
+  email: string;
+
+  phone_number: string;
+
+  registered_at?: Date;
+
+  created_at?: Date;
+
+  updated_at?: Date;
+}
+
+// ======================================================
+// CREATE WEBSITE USER PAYLOAD
+// ======================================================
+
+export interface CreateWebsiteUserPayload {
+  name: string;
+
+  email: string;
+
+  phone_number: string;
+}
+
+// ======================================================
+// EMPTY WEBSITE USER
+// ======================================================
+
+export const EMPTY_WEBSITE_USER: CreateWebsiteUserPayload = {
+  name: "",
+
+  email: "",
+
+  phone_number: "",
+};
