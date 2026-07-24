@@ -852,32 +852,40 @@ function ChatWidgetInner() {
   const handleExpertSelect = useCallback(
     async (expert: ExpertUser) => {
       const contact = savedContact ?? mentorForm;
+
       pushMessage("user", `Chat with ${expert.name}`);
 
-      // Set up conversation payload
-      handleConversationChange({
-        target: { name: "visitor_name", value: contact.name },
-      } as ChangeEvent<HTMLInputElement>);
-      handleConversationChange({
-        target: { name: "visitor_email", value: contact.email },
-      } as ChangeEvent<HTMLInputElement>);
-      handleConversationChange({
-        target: { name: "visitor_phone_number", value: contact.mobile },
-      } as ChangeEvent<HTMLInputElement>);
-      handleConversationChange({
-        target: {
-          name: "category_generated_id",
-          value: selectedCategory?.category_generated_id ?? "",
-        },
-      } as ChangeEvent<HTMLInputElement>);
-      handleConversationChange({
-        target: { name: "category_name", value: selectedCategory?.name ?? "" },
-      } as ChangeEvent<HTMLInputElement>);
+      // Build payload directly
+      const conversationPayload = {
+        visitor_name: contact.name,
+        visitor_email: contact.email,
+        visitor_phone_number: contact.mobile,
+        category_generated_id: selectedCategory?.category_generated_id ?? "",
+        category_name: selectedCategory?.name ?? "",
+      };
 
-      pendingMentorExpertRef.current = expert;
+      // Update context state
+      Object.entries(conversationPayload).forEach(([name, value]) => {
+        handleConversationChange({
+          target: {
+            name,
+            value,
+          },
+        } as ChangeEvent<HTMLInputElement>);
+      });
+
       setIsTyping(true);
 
-      const success = await createConversation();
+      // Wait for React state update
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const success = await createConversation({
+        visitor_name: contact.name,
+        visitor_email: contact.email,
+        visitor_phone_number: contact.mobile,
+        category_generated_id: selectedCategory?.category_generated_id ?? "",
+        category_name: selectedCategory?.name ?? "",
+      });
 
       setIsTyping(false);
 
@@ -886,6 +894,7 @@ function ChatWidgetInner() {
           "bot",
           `Connecting you with **${expert.name}**. Say hello below — they'll join shortly.`,
         );
+
         setFlowStep("mentor-chat");
       } else {
         pushMessage(

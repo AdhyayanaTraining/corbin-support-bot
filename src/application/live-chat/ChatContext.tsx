@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 // ======================================================
@@ -97,7 +98,7 @@ interface ChatContextType {
   // CONVERSATION
   // ======================================================
 
-  createConversation: () => Promise<boolean>;
+  createConversation(payload: CreateConversationPayload): Promise<boolean>;
 
   getConversation: (conversation_generated_id: string) => Promise<void>;
 
@@ -293,22 +294,21 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // CREATE CONVERSATION
   // ====================================================
 
-  const createConversation = async (): Promise<boolean> => {
+  const createConversation = async (
+    payload: CreateConversationPayload,
+  ): Promise<boolean> => {
     try {
-      const validationErrors = validateConversation(conversation);
+      const validationErrors = validateConversation(payload);
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
-
         return false;
       }
 
       setLoading(true);
 
-      console.log("Conversation Payload:");
-      console.log(conversation);
+      const response = await ChatService.createConversation(payload);
 
-      const response = await ChatService.createConversation(conversation);
       if (response.success) {
         setSelectedConversationState(response.data);
 
@@ -319,22 +319,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           conversation_generated_id: response.data.conversation_generated_id,
         }));
 
-        resetConversation();
-
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error("Failed to create conversation.");
-
-      console.log("Payload:");
-      console.log(conversation);
-
-      console.log("Backend Response:");
-
-      console.error("Failed to create conversation.", error);
-
+      console.error(error);
       return false;
     } finally {
       setLoading(false);
