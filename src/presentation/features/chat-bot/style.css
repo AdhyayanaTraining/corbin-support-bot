@@ -225,6 +225,13 @@
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
 }
 
+/* NEW: waiting-for-mentor status pulse (mentor-chat header) */
+.cw-status-dot--waiting {
+  background: var(--cw-gold) !important;
+  box-shadow: 0 0 0 2px rgba(245, 179, 1, 0.25);
+  animation: cw-pulse 1.5s ease-in-out infinite;
+}
+
 .cw-header-status span {
   color: #b8c2d9 !important;
   font-size: 11px;
@@ -507,7 +514,7 @@
   align-items: center;
 }
 
-/* ============ CATEGORIES (TOPICS) ============ */
+/* ============ CATEGORIES (TOPICS) — also reused by the mentor topic picker ============ */
 
 .cw-categories-wrap {
   padding: 6px 0 4px 34px;
@@ -544,6 +551,13 @@
 
 .cw-category-card:active {
   transform: scale(0.98);
+}
+
+.cw-category-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .cw-category-icon {
@@ -908,6 +922,16 @@ button.cw-breadcrumb-item:hover {
   background: rgba(34, 197, 94, 0.04) !important;
 }
 
+/* NEW: "Talk to a Mentor" option button */
+.cw-option-mentor .cw-option-icon {
+  background: rgba(245, 179, 1, 0.14);
+  color: #92660a;
+}
+.cw-option-mentor:hover {
+  border-color: var(--cw-gold);
+  background: rgba(245, 179, 1, 0.05) !important;
+}
+
 .cw-option-query .cw-option-icon {
   background: rgba(139, 92, 246, 0.1);
   color: #8b5cf6;
@@ -1045,6 +1069,16 @@ button.cw-breadcrumb-item:hover {
 
 .cw-query-submit-btn svg {
   color: #ffffff !important;
+}
+
+/* ============ NEW: MENTOR CHAT (live conversation) ============ */
+
+/* Reuses .cw-msg / .cw-avatar / .cw-bubble for message bubbles, and
+   .cw-categories-wrap / .cw-category-card for the topic picker.
+   The empty-state message before the first reply gets a touch more
+   breathing room in the message stream. */
+.cw-mentor-empty {
+  margin-left: 34px;
 }
 
 /* ============ LOADING / EMPTY STATES ============ */
