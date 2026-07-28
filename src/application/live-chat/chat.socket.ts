@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { io, Socket } from "socket.io-client";
 
 // ======================================================
-// SOCKET
+// CHAT SOCKET
 // ======================================================
 
 class ChatSocket {
@@ -12,7 +13,7 @@ class ChatSocket {
   // CONNECT
   // =====================================================
 
-  connect() {
+  connect(): Socket {
     if (this.socket?.connected) {
       return this.socket;
     }
@@ -31,7 +32,7 @@ class ChatSocket {
   // DISCONNECT
   // =====================================================
 
-  disconnect() {
+  disconnect(): void {
     if (!this.socket) {
       return;
     }
@@ -50,51 +51,67 @@ class ChatSocket {
   }
 
   // =====================================================
-  // JOIN ROOM
+  // JOIN CONVERSATION ROOM
   // =====================================================
 
-  joinRoom(conversation_generated_id: string) {
+  joinRoom(conversation_generated_id: string): void {
     this.socket?.emit("join_room", conversation_generated_id);
   }
 
   // =====================================================
-  // LEAVE ROOM
+  // LEAVE CONVERSATION ROOM
   // =====================================================
 
-  leaveRoom(conversation_generated_id: string) {
+  leaveRoom(conversation_generated_id: string): void {
     this.socket?.emit("leave_room", conversation_generated_id);
   }
 
   // =====================================================
-  // TYPING
+  // VISITOR TYPING
   // =====================================================
 
-  typing(conversation_generated_id: string) {
+  typing(conversation_generated_id: string): void {
     this.socket?.emit("typing", conversation_generated_id);
   }
 
   // =====================================================
-  // STOP TYPING
+  // VISITOR STOP TYPING
   // =====================================================
 
-  stopTyping(conversation_generated_id: string) {
+  stopTyping(conversation_generated_id: string): void {
     this.socket?.emit("stop_typing", conversation_generated_id);
   }
 
   // =====================================================
-  // ON
+  // REGISTER EVENT
   // =====================================================
 
-  on(event: string, callback: (...args: any[]) => void) {
+  on(event: string, callback: (...args: any[]) => void): void {
     this.socket?.on(event, callback);
   }
 
   // =====================================================
-  // OFF
+  // REMOVE EVENT
   // =====================================================
 
-  off(event: string, callback?: (...args: any[]) => void) {
-    this.socket?.off(event, callback);
+  off(event: string, callback?: (...args: any[]) => void): void {
+    if (!this.socket) {
+      return;
+    }
+
+    if (callback) {
+      this.socket.off(event, callback);
+    } else {
+      this.socket.off(event);
+    }
+  }
+
+  // =====================================================
+  // EMIT CUSTOM EVENT
+  // =====================================================
+
+  emit(event: string, payload?: any): void {
+    this.socket?.emit(event, payload);
   }
 }
 

@@ -1,5 +1,9 @@
 import axiosClient from "@/src/infrastructure/api/axiosClient";
-import { CreateUserPayload, UpdateUserPayload } from "./user.types";
+import {
+  CreateUserPayload,
+  UpdateUserPayload,
+  UpdateExpertAvailabilityPayload,
+} from "./user.types";
 
 class UserService {
   // =====================================================
@@ -32,12 +36,34 @@ class UserService {
   }
 
   // =====================================================
-  // GET EXPERTS BY CATEGORY
+  // GET EXPERT BY ID (NEW)
   // =====================================================
 
-  async getExpertsByCategory(category_generated_id: string) {
+  async getExpertById(user_generated_id: string) {
     const response = await axiosClient.get(
-      `/get-experts-by-category/${category_generated_id}`,
+      `/get-expert-by-id/${user_generated_id}`,
+    );
+    return response.data;
+  }
+
+  // =====================================================
+  // GET EXPERTS BY CATEGORY (UPDATED - QUERY PARAM)
+  // =====================================================
+
+  async getExpertsByCategory(category: string) {
+    const response = await axiosClient.get(
+      `/get-experts-by-category?category=${encodeURIComponent(category)}`,
+    );
+    return response.data;
+  }
+
+  // =====================================================
+  // GET EXPERTS BY CATEGORY ID (NEW)
+  // =====================================================
+
+  async getExpertsByCategoryId(category_generated_id: string) {
+    const response = await axiosClient.get(
+      `/get-experts-by-category-id/${category_generated_id}`,
     );
     return response.data;
   }
@@ -49,6 +75,21 @@ class UserService {
   async updateUser(user_generated_id: string, payload: UpdateUserPayload) {
     const response = await axiosClient.put(
       `/update-user/${user_generated_id}`,
+      payload,
+    );
+    return response.data;
+  }
+
+  // =====================================================
+  // UPDATE EXPERT AVAILABILITY (NEW)
+  // =====================================================
+
+  async updateExpertAvailability(
+    user_generated_id: string,
+    payload: UpdateExpertAvailabilityPayload,
+  ) {
+    const response = await axiosClient.put(
+      `/update-expert-availability/${user_generated_id}`,
       payload,
     );
     return response.data;

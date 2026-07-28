@@ -1850,7 +1850,7 @@ interface ContactDetails {
   name: string;
   mobile: string;
   email: string;
-  registered_employee_generated_id?: string; // ADD THIS LINE
+  registered_employee_generated_id?: string;
 }
 
 const MENTOR_STEPS: {
@@ -1893,7 +1893,7 @@ function ChatWidgetInner() {
     handleChange: handleWebsiteUserChange,
     addWebsiteUser,
     resetForm: resetWebsiteUserForm,
-    registeredEmployeeId, // ADD THIS
+    registeredEmployeeId,
   } = useWebsiteUser();
   const {
     requestQuery,
@@ -1903,26 +1903,46 @@ function ChatWidgetInner() {
     addRequestQuery,
     resetForm: resetRequestQueryForm,
   } = useRequestQuery();
+
+  // =====================================================
+  // UPDATED: Destructure new context methods
+  // =====================================================
   const {
     messages: mentorMessages,
+    conversations,
     selectedConversation,
     message: mentorMessage,
     errors: mentorErrors,
     loading: mentorLoading,
+
+    setSelectedConversation,
+
     handleConversationChange,
     handleMessageChange: handleMentorMessageChange,
+
     resetConversation: resetMentorConversation,
     resetMessage: resetMentorMessage,
+
     createConversation,
+
+    getVisitorConversations,
+
     sendMessage: sendMentorMessage,
+
     getConversationMessages,
+
     joinRoom,
     leaveRoom,
   } = useChat();
+
+  // =====================================================
+  // UPDATED: Include getExpertsByCategoryId from UserContext
+  // =====================================================
   const {
     expertCategories,
     getExpertCategories,
-    getExpertsByCategory,
+    getExpertsByCategory, // Search by category NAME
+    getExpertsByCategoryId, // Search by category ID (NEW)
     loading: expertsLoading,
   } = useUser();
 
@@ -1960,33 +1980,65 @@ function ChatWidgetInner() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasSavedContact = useRef(false);
 
+  // =====================================================
+  // Load saved contact AND fetch visitor conversations
+  // =====================================================
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(CONTACT_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<ContactDetails>;
         if (parsed?.name && parsed?.email && parsed?.mobile) {
-          setSavedContact({
+          const contact: ContactDetails = {
             name: parsed.name,
             mobile: parsed.mobile,
             email: parsed.email,
             registered_employee_generated_id:
               parsed.registered_employee_generated_id || "",
-          });
+          };
+          setSavedContact(contact);
+
+          // Fetch visitor conversations after loading saved contact
+          if (contact.registered_employee_generated_id) {
+            getVisitorConversations(contact.registered_employee_generated_id);
+          }
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error("Error loading saved contact:", err);
+    }
   }, []);
+
+  // =====================================================
+  // Restore active conversation automatically
+  // =====================================================
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) return;
+    if (flowStep === "mentor-chat") return; // Already in chat
+
+    const existingConversation = conversations.find(
+      (c) => c.status === "WAITING" || c.status === "ACTIVE",
+    );
+
+    if (existingConversation) {
+      setSelectedConversation(existingConversation);
+      getConversationMessages(existingConversation.conversation_generated_id);
+      setFlowStep("mentor-chat");
+    }
+  }, [conversations]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping, flowStep, chatbotMessages, mentorMessages]);
+
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, []);
+
   useEffect(() => {
     if (!isEmbedded) return;
     window.parent.postMessage(
@@ -1994,6 +2046,21 @@ function ChatWidgetInner() {
       "*",
     );
   }, [isOpen, isEmbedded]);
+
+  // =====================================================
+  // Auto-load messages when selectedConversation changes
+  // =====================================================
+  useEffect(() => {
+    const conversationId = selectedConversation?.conversation_generated_id;
+    if (flowStep !== "mentor-chat" || !conversationId) return;
+
+    joinRoom(conversationId);
+    getConversationMessages(conversationId);
+
+    return () => {
+      leaveRoom(conversationId);
+    };
+  }, [flowStep, selectedConversation?.conversation_generated_id]);
 
   const pushMessage = useCallback((sender: Sender, text: string) => {
     setMessages((prev) => [
@@ -2013,13 +2080,9 @@ function ChatWidgetInner() {
     [pushMessage],
   );
 
-  // Add this ref near your other refs (around line ~180)
-  const hasSavedContact = useRef(false);
-
-  // Replace your submitTrigger useEffect with this:
   useEffect(() => {
     if (submitTrigger === 0) return;
-    if (hasSavedContact.current) return; // Prevent double execution
+    if (hasSavedContact.current) return;
 
     let cancelled = false;
     hasSavedContact.current = true;
@@ -2067,7 +2130,7 @@ function ChatWidgetInner() {
     return () => {
       cancelled = true;
     };
-  }, [submitTrigger]); // REMOVE registeredEmployeeId from deps
+  }, [submitTrigger]);
 
   useEffect(() => {
     if (querySubmitTrigger === 0) return;
@@ -2090,16 +2153,6 @@ function ChatWidgetInner() {
       cancelled = true;
     };
   }, [querySubmitTrigger]);
-
-  useEffect(() => {
-    const conversationId = selectedConversation?.conversation_generated_id;
-    if (flowStep !== "mentor-chat" || !conversationId) return;
-    joinRoom(conversationId);
-    getConversationMessages(conversationId);
-    return () => {
-      leaveRoom(conversationId);
-    };
-  }, [flowStep, selectedConversation?.conversation_generated_id]);
 
   const handleStart = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -2260,22 +2313,40 @@ function ChatWidgetInner() {
     [pushMessage, simulateTyping],
   );
 
+  // =====================================================
+  // Check for active conversation before showing options
+  // =====================================================
   const handleShowSatisfaction = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     pushMessage("user", "I need more help");
+
     if (savedContact) {
-      setIsTyping(true);
-      typingTimeoutRef.current = setTimeout(() => {
-        setIsTyping(false);
-        pushMessage(
-          "bot",
-          `Welcome back, **${savedContact.name}**! How would you like to proceed?`,
-        );
-        setMentorForm(savedContact);
-        setFlowStep("mentor-options");
-      }, 550);
+      // Check if there's an active conversation
+      if (selectedConversation && selectedConversation.status !== "CLOSED") {
+        setIsTyping(true);
+        typingTimeoutRef.current = setTimeout(() => {
+          setIsTyping(false);
+          pushMessage(
+            "bot",
+            `Welcome back, **${savedContact.name}**! Resuming your conversation.`,
+          );
+          setFlowStep("mentor-chat");
+        }, 550);
+      } else {
+        setIsTyping(true);
+        typingTimeoutRef.current = setTimeout(() => {
+          setIsTyping(false);
+          pushMessage(
+            "bot",
+            `Welcome back, **${savedContact.name}**! How would you like to proceed?`,
+          );
+          setMentorForm(savedContact);
+          setFlowStep("mentor-options");
+        }, 550);
+      }
       return;
     }
+
     setIsTyping(true);
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
@@ -2289,7 +2360,7 @@ function ChatWidgetInner() {
       setDraft("");
       setFlowStep("mentor-form");
     }, 550);
-  }, [pushMessage, savedContact]);
+  }, [pushMessage, savedContact, selectedConversation]);
 
   const handleEditContact = useCallback(() => {
     setSavedContact(null);
@@ -2302,7 +2373,7 @@ function ChatWidgetInner() {
       mobile: "",
       email: "",
       registered_employee_generated_id: "",
-    }); // ADD
+    });
     setMentorFormStep("name");
     setFormError(null);
     setDraft("");
@@ -2351,12 +2422,11 @@ function ChatWidgetInner() {
     }
     setFormError(null);
     pushMessage("user", text);
-    // In the final step (email validation), update:
     const finalForm: ContactDetails = {
       ...mentorForm,
       email: text,
       registered_employee_generated_id:
-        savedContact?.registered_employee_generated_id || "", // PRESERVE
+        savedContact?.registered_employee_generated_id || "",
     };
     setMentorForm(finalForm);
     setDraft("");
@@ -2376,6 +2446,7 @@ function ChatWidgetInner() {
     draft,
     mentorFormStep,
     mentorForm,
+    savedContact,
     pushMessage,
     simulateTyping,
     handleWebsiteUserChange,
@@ -2418,7 +2489,18 @@ function ChatWidgetInner() {
     handleRequestQueryChange,
   ]);
 
+  // =====================================================
+  // Prevent reconnect if already chatting
+  // =====================================================
   const handleShowMentorTopics = useCallback(async () => {
+    // If already in active conversation, resume it
+    if (selectedConversation && selectedConversation.status !== "CLOSED") {
+      pushMessage("user", "Talk to a Mentor");
+      simulateTyping("Resuming your conversation...");
+      setFlowStep("mentor-chat");
+      return;
+    }
+
     pushMessage("user", "Talk to a Mentor");
     const categories = await getExpertCategories();
     if (categories.length > 0) {
@@ -2428,17 +2510,32 @@ function ChatWidgetInner() {
       simulateTyping("No mentor categories available. Try again later.");
       setFlowStep("mentor-options");
     }
-  }, [pushMessage, simulateTyping, getExpertCategories]);
+  }, [pushMessage, simulateTyping, getExpertCategories, selectedConversation]);
 
+  // =====================================================
+  // FIXED: Use getExpertsByCategoryId for ID-based lookup
+  // =====================================================
   const handleMentorCategorySelect = useCallback(
     async (category: ExpertCategory) => {
       pushMessage("user", category.name);
       setSelectedExpertCategory(category);
       setIsTyping(true);
-      const experts = await getExpertsByCategory(
-        category.category_generated_id ?? "",
-      );
+
+      // FIX: Use category_generated_id for ID-based lookup
+      // If category has an ID, use getExpertsByCategoryId
+      // Otherwise fall back to name-based search
+      let experts: ExpertUser[] = [];
+
+      if (category.category_generated_id) {
+        // Use ID-based lookup (preferred)
+        experts = await getExpertsByCategoryId(category.category_generated_id);
+      } else {
+        // Fallback to name-based lookup
+        experts = await getExpertsByCategory(category.name);
+      }
+
       setIsTyping(false);
+
       if (experts.length > 0) {
         setMentorExperts(experts);
         pushMessage(
@@ -2454,7 +2551,7 @@ function ChatWidgetInner() {
         setFlowStep("mentor-topics");
       }
     },
-    [pushMessage, getExpertsByCategory],
+    [pushMessage, getExpertsByCategory, getExpertsByCategoryId],
   );
 
   const handleExpertSelect = useCallback(
@@ -2462,7 +2559,7 @@ function ChatWidgetInner() {
       const contact = savedContact ?? mentorForm;
       pushMessage("user", `Chat with ${expert.name}`);
       setIsTyping(true);
-      const success = await createConversation({
+      const payload = {
         visitor_name: contact.name,
         visitor_email: contact.email,
         visitor_phone_number: contact.mobile,
@@ -2470,7 +2567,11 @@ function ChatWidgetInner() {
         category_generated_id:
           selectedExpertCategory?.category_generated_id ?? "",
         category_name: selectedExpertCategory?.name ?? "",
-      });
+      };
+
+      console.log("Conversation Payload:", payload);
+
+      const success = await createConversation(payload);
       setIsTyping(false);
       if (success) {
         pushMessage("bot", `Connecting with **${expert.name}**. Say hello!`);
@@ -2492,6 +2593,7 @@ function ChatWidgetInner() {
     e?.preventDefault();
     setQuerySubmitTrigger((n) => n + 1);
   }, []);
+
   const handleSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2499,6 +2601,7 @@ function ChatWidgetInner() {
     },
     [flowStep, handleMentorFormSubmit],
   );
+
   const handleLiveChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2507,6 +2610,7 @@ function ChatWidgetInner() {
     },
     [chatbotQuestion, askQuestion],
   );
+
   const handleMentorChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();

@@ -54,65 +54,57 @@ import {
 // ======================================================
 
 interface ChatContextType {
-  // Loading
+  // ====================================================
+  // STATE
+  // ====================================================
+
   loading: boolean;
 
-  // Socket
   socketConnected: boolean;
 
-  // Lists
   conversations: ChatConversation[];
 
   messages: ChatMessage[];
 
-  // Selected Conversation
   selectedConversation: ChatConversation | null;
 
-  // Forms
   conversation: CreateConversationPayload;
 
   message: SendMessagePayload;
 
-  // Errors
   errors: ChatValidationErrors;
 
-  // Set Selected Conversation
+  // ====================================================
+  // FORM
+  // ====================================================
+
   setSelectedConversation: (conversation: ChatConversation) => void;
 
-  // Handle Conversation Input
   handleConversationChange: (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => void;
 
-  // Handle Message Input
   handleMessageChange: (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => void;
 
-  // Reset Forms
   resetConversation: () => void;
 
   resetMessage: () => void;
 
-  // ======================================================
+  // ====================================================
   // CONVERSATION
-  // ======================================================
+  // ====================================================
 
-  createConversation(payload: CreateConversationPayload): Promise<boolean>;
+  createConversation: (payload: CreateConversationPayload) => Promise<boolean>;
 
   getConversation: (conversation_generated_id: string) => Promise<void>;
 
-  getWaitingConversations: () => Promise<void>;
+  getVisitorConversations: (visitor_generated_id: string) => Promise<void>;
 
-  getActiveConversations: () => Promise<void>;
-
-  getExpertConversations: (expert_generated_id: string) => Promise<void>;
-
-  getVisitorConversations: (visitor_email: string) => Promise<void>;
-
-  // ======================================================
+  // ====================================================
   // MESSAGE
-  // ======================================================
+  // ====================================================
 
   sendMessage: () => Promise<boolean>;
 
@@ -124,19 +116,9 @@ interface ChatContextType {
 
   getUnreadCount: (conversation_generated_id: string) => Promise<number>;
 
-  // ======================================================
-  // ACTIONS
-  // ======================================================
-
-  acceptConversation: (conversation_generated_id: string) => Promise<boolean>;
-
-  closeConversation: (conversation_generated_id: string) => Promise<boolean>;
-
-  deleteConversation: (conversation_generated_id: string) => Promise<boolean>;
-
-  // ======================================================
+  // ====================================================
   // SOCKET
-  // ======================================================
+  // ====================================================
 
   connectSocket: () => void;
 
@@ -207,7 +189,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [message, setMessage] = useState<SendMessagePayload>(EMPTY_MESSAGE);
 
   // ====================================================
-  // VALIDATION ERRORS
+  // VALIDATION
   // ====================================================
 
   const [errors, setErrors] = useState<ChatValidationErrors>({});
@@ -295,6 +277,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ====================================================
+  // PART 2 STARTS FROM HERE...
+  // ====================================================
+  // ====================================================
   // CREATE CONVERSATION
   // ====================================================
 
@@ -306,6 +291,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
+
         return false;
       }
 
@@ -314,22 +300,31 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const response = await ChatService.createConversation(payload);
 
       if (response.success) {
-        setSelectedConversationState(response.data);
+        setSelectedConversation(response.data);
 
-        setConversations((prev) => [response.data, ...prev]);
+        setConversations((prev) => {
+          const exists = prev.some(
+            (conversation) =>
+              conversation.conversation_generated_id ===
+              response.data.conversation_generated_id,
+          );
 
-        setMessage((prev) => ({
-          ...prev,
-          conversation_generated_id: response.data.conversation_generated_id,
-          sender: "VISITOR",
-          sender_generated_id: payload.visitor_generated_id,
-        }));
+          if (exists) {
+            return prev;
+          }
+
+          return [response.data, ...prev];
+        });
+
         return true;
       }
 
       return false;
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.log("Create Conversation Error");
+      console.log(error.response?.status);
+      console.log(error.response?.data);
+
       return false;
     } finally {
       setLoading(false);
@@ -351,73 +346,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       );
 
       if (response.success) {
-        setSelectedConversationState(response.data);
+        setSelectedConversation(response.data);
       }
     } catch (error) {
       console.error("Failed to fetch conversation.", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ====================================================
-  // GET WAITING CONVERSATIONS
-  // ====================================================
-
-  const getWaitingConversations = async (): Promise<void> => {
-    try {
-      setLoading(true);
-
-      const response = await ChatService.getWaitingConversations();
-
-      if (response.success) {
-        setConversations(response.data ?? []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch waiting conversations.", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ====================================================
-  // GET ACTIVE CONVERSATIONS
-  // ====================================================
-
-  const getActiveConversations = async (): Promise<void> => {
-    try {
-      setLoading(true);
-
-      const response = await ChatService.getActiveConversations();
-
-      if (response.success) {
-        setConversations(response.data ?? []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch active conversations.", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ====================================================
-  // GET EXPERT CONVERSATIONS
-  // ====================================================
-
-  const getExpertConversations = async (
-    expert_generated_id: string,
-  ): Promise<void> => {
-    try {
-      setLoading(true);
-
-      const response =
-        await ChatService.getExpertConversations(expert_generated_id);
-
-      if (response.success) {
-        setConversations(response.data ?? []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch expert conversations.", error);
     } finally {
       setLoading(false);
     }
@@ -428,12 +360,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // ====================================================
 
   const getVisitorConversations = async (
-    visitor_email: string,
+    visitor_generated_id: string,
   ): Promise<void> => {
     try {
       setLoading(true);
 
-      const response = await ChatService.getVisitorConversations(visitor_email);
+      const response =
+        await ChatService.getVisitorConversations(visitor_generated_id);
 
       if (response.success) {
         setConversations(response.data ?? []);
@@ -455,6 +388,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
+
         return false;
       }
 
@@ -465,7 +399,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       if (response.success) {
         resetMessage();
 
-        // TEMPORARY
         await getConversationMessages(message.conversation_generated_id);
 
         return true;
@@ -473,7 +406,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       return false;
     } catch (error) {
-      console.error(error);
+      console.error("Failed to send message.", error);
+
       return false;
     } finally {
       setLoading(false);
@@ -498,7 +432,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setMessages(response.data ?? []);
       }
     } catch (error) {
-      console.error("Failed to fetch conversation messages.", error);
+      console.error("Failed to fetch messages.", error);
     } finally {
       setLoading(false);
     }
@@ -518,8 +452,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       if (response.success) {
         setMessages((prev) =>
-          prev.map((msg) => ({
-            ...msg,
+          prev.map((message) => ({
+            ...message,
             is_read: true,
           })),
         );
@@ -529,7 +463,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       return false;
     } catch (error) {
-      console.error("Failed to mark messages as read.", error);
+      console.error("Failed to mark conversation as read.", error);
 
       return false;
     }
@@ -560,168 +494,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ====================================================
-  // ACCEPT CONVERSATION
-  // ====================================================
-
-  const acceptConversation = async (
-    conversation_generated_id: string,
-  ): Promise<boolean> => {
-    try {
-      setLoading(true);
-
-      const response = await ChatService.acceptConversation(
-        conversation_generated_id,
-      );
-
-      if (response.success) {
-        setConversations((prev) =>
-          prev.map((conversation) =>
-            conversation.conversation_generated_id === conversation_generated_id
-              ? {
-                  ...conversation,
-                  status: "ACTIVE",
-                  accepted_at: new Date().toISOString(),
-                }
-              : conversation,
-          ),
-        );
-
-        if (
-          selectedConversation?.conversation_generated_id ===
-          conversation_generated_id
-        ) {
-          setSelectedConversationState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: "ACTIVE",
-                  accepted_at: new Date().toISOString(),
-                }
-              : null,
-          );
-        }
-
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error("Failed to accept conversation.", error);
-
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ====================================================
-  // CLOSE CONVERSATION
-  // ====================================================
-
-  const closeConversation = async (
-    conversation_generated_id: string,
-  ): Promise<boolean> => {
-    try {
-      setLoading(true);
-
-      const response = await ChatService.closeConversation(
-        conversation_generated_id,
-      );
-
-      if (response.success) {
-        setConversations((prev) =>
-          prev.map((conversation) =>
-            conversation.conversation_generated_id === conversation_generated_id
-              ? {
-                  ...conversation,
-                  status: "CLOSED",
-                  closed_at: new Date().toISOString(),
-                }
-              : conversation,
-          ),
-        );
-
-        if (
-          selectedConversation?.conversation_generated_id ===
-          conversation_generated_id
-        ) {
-          setSelectedConversationState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: "CLOSED",
-                  closed_at: new Date().toISOString(),
-                }
-              : null,
-          );
-        }
-
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error("Failed to close conversation.", error);
-
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ====================================================
-  // DELETE CONVERSATION
-  // ====================================================
-
-  const deleteConversation = async (
-    conversation_generated_id: string,
-  ): Promise<boolean> => {
-    try {
-      setLoading(true);
-
-      const response = await ChatService.deleteConversation(
-        conversation_generated_id,
-      );
-
-      if (response.success) {
-        setConversations((prev) =>
-          prev.filter(
-            (conversation) =>
-              conversation.conversation_generated_id !==
-              conversation_generated_id,
-          ),
-        );
-
-        if (
-          selectedConversation?.conversation_generated_id ===
-          conversation_generated_id
-        ) {
-          setSelectedConversationState(null);
-
-          setMessages([]);
-        }
-
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error("Failed to delete conversation.", error);
-
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ====================================================
   // CONNECT SOCKET
   // ====================================================
 
-  const connectSocket = (): boolean => {
+  const connectSocket = () => {
     const socket = ChatSocket.connect();
 
-    return !!socket;
+    setSocketConnected(!!socket);
   };
 
   // ====================================================
@@ -767,126 +546,72 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ====================================================
+  // PART 3 STARTS FROM HERE...
+  // ====================================================
+  // ====================================================
   // SOCKET EVENTS
   // ====================================================
 
   useEffect(() => {
-    connectSocket();
+    const socket = ChatSocket.connect();
 
-    ChatSocket.on("conversation_created", (conversation: ChatConversation) => {
-      setConversations((prev) => [conversation, ...prev]);
+    if (!socket) return;
+
+    socket.on("connect", () => {
+      setSocketConnected(true);
     });
 
-    ChatSocket.on(
-      "conversation_accepted",
-      ({
-        conversation_generated_id,
-      }: {
-        conversation_generated_id: string;
-      }) => {
-        setConversations((prev) =>
-          prev.map((conversation) =>
-            conversation.conversation_generated_id === conversation_generated_id
-              ? {
-                  ...conversation,
-                  status: "ACTIVE",
-                }
-              : conversation,
-          ),
-        );
-      },
-    );
-
-    ChatSocket.on("new_message", (message: ChatMessage) => {
-      setMessages((prev) => [...prev, message]);
+    socket.on("disconnect", () => {
+      setSocketConnected(false);
     });
-
-    ChatSocket.on("messages_read", () => {
-      setMessages((prev) =>
-        prev.map((message) => ({
-          ...message,
-          is_read: true,
-        })),
-      );
-    });
-
-    ChatSocket.on(
-      "conversation_closed",
-      ({
-        conversation_generated_id,
-      }: {
-        conversation_generated_id: string;
-      }) => {
-        setConversations((prev) =>
-          prev.map((conversation) =>
-            conversation.conversation_generated_id === conversation_generated_id
-              ? {
-                  ...conversation,
-                  status: "CLOSED",
-                }
-              : conversation,
-          ),
-        );
-      },
-    );
-
-    ChatSocket.on(
-      "conversation_deleted",
-      ({
-        conversation_generated_id,
-      }: {
-        conversation_generated_id: string;
-      }) => {
-        setConversations((prev) =>
-          prev.filter(
-            (conversation) =>
-              conversation.conversation_generated_id !==
-              conversation_generated_id,
-          ),
-        );
-      },
-    );
 
     return () => {
-      // Clean up all socket listeners to prevent memory leaks
-      ChatSocket.off("conversation_created");
-      ChatSocket.off("conversation_accepted");
-      ChatSocket.off("new_message");
-      ChatSocket.off("messages_read");
-      ChatSocket.off("conversation_closed");
-      ChatSocket.off("conversation_deleted");
+      socket.off("connect");
+      socket.off("disconnect");
 
-      disconnectSocket();
+      ChatSocket.disconnect();
     };
   }, []);
+
+  // ====================================================
+  // JOIN / LEAVE CONVERSATION ROOM
+  // ====================================================
+
+  useEffect(() => {
+    if (!selectedConversation) {
+      return;
+    }
+
+    joinRoom(selectedConversation.conversation_generated_id);
+
+    return () => {
+      leaveRoom(selectedConversation.conversation_generated_id);
+    };
+  }, [selectedConversation]);
 
   // ====================================================
   // CONTEXT VALUE
   // ====================================================
 
   const value: ChatContextType = {
-    // Loading
+    // State
     loading,
 
-    // Socket
     socketConnected,
 
-    // Data
     conversations,
 
     messages,
 
     selectedConversation,
 
-    // Forms
     conversation,
 
     message,
 
-    // Validation
     errors,
 
-    // Form Functions
+    // Form
     setSelectedConversation,
 
     handleConversationChange,
@@ -897,20 +622,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     resetMessage,
 
-    // Conversation APIs
+    // Conversation
     createConversation,
 
     getConversation,
 
-    getWaitingConversations,
-
-    getActiveConversations,
-
-    getExpertConversations,
-
     getVisitorConversations,
 
-    // Message APIs
+    // Message
     sendMessage,
 
     getConversationMessages,
@@ -918,13 +637,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     markConversationAsRead,
 
     getUnreadCount,
-
-    // Conversation Actions
-    acceptConversation,
-
-    closeConversation,
-
-    deleteConversation,
 
     // Socket
     connectSocket,

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 // ======================================================
@@ -28,8 +29,12 @@ import {
   CreateUserPayload,
   UpdateUserPayload,
   ExpertCategory,
+  AvailableDay,
+  TimeSlot,
   EMPTY_USER,
   EMPTY_CATEGORY,
+  EMPTY_AVAILABLE_DAY,
+  DAYS_OF_WEEK,
 } from "./user.types";
 
 // ======================================================
@@ -50,6 +55,9 @@ interface UserContextType {
   selectedUser: User | null;
   categoryInput: ExpertCategory;
   categoryErrors: { name?: string; description?: string };
+  availableDays: AvailableDay[];
+  currentDay: AvailableDay;
+  currentTimeSlot: TimeSlot;
 
   setSelectedUserData: (user: User) => void;
   handleChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
@@ -60,13 +68,32 @@ interface UserContextType {
   resetCategoryInput: () => void;
   expertCategories: ExpertCategory[];
 
+  // Availability management
+  handleDayChange: (dayIndex: number, field: string, value: any) => void;
+  handleTimeSlotChange: (
+    dayIndex: number,
+    slotIndex: number,
+    field: string,
+    value: string,
+  ) => void;
+  addTimeSlot: (dayIndex: number) => void;
+  removeTimeSlot: (dayIndex: number, slotIndex: number) => void;
+  toggleDayAvailability: (dayIndex: number) => void;
+  initializeDefaultAvailability: () => void;
+
   getExpertCategories: () => Promise<ExpertCategory[]>;
 
   addUser: () => Promise<boolean>;
   getUsers: () => Promise<void>;
+  getExpertById: (user_generated_id: string) => Promise<User | null>;
   getExpertsByCategory: (category: string) => Promise<User[]>;
+  getExpertsByCategoryId: (category_generated_id: string) => Promise<User[]>;
   getUserByGeneratedId: (user_generated_id: string) => Promise<void>;
   updateUser: () => Promise<boolean>;
+  updateExpertAvailability: (
+    user_generated_id: string,
+    available_days: AvailableDay[],
+  ) => Promise<boolean>;
   deleteUser: (user_generated_id: string) => Promise<boolean>;
   addExpertCategory: (
     user_generated_id: string,
@@ -139,6 +166,38 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   }>({});
 
   // ======================================================
+  // AVAILABILITY STATE
+  // ======================================================
+
+  const [availableDays, setAvailableDays] = useState<AvailableDay[]>([]);
+  const [currentDay, setCurrentDay] =
+    useState<AvailableDay>(EMPTY_AVAILABLE_DAY);
+  const [currentTimeSlot, setCurrentTimeSlot] = useState<TimeSlot>({
+    start_time: "09:00",
+    end_time: "17:00",
+  });
+
+  // ======================================================
+  // INITIALIZE DEFAULT AVAILABILITY
+  // ======================================================
+
+  const initializeDefaultAvailability = () => {
+    const defaultDays: AvailableDay[] = DAYS_OF_WEEK.map((day) => ({
+      day,
+      time_slots: [{ start_time: "09:00", end_time: "18:00" }], // Changed to 9 AM - 6 PM
+      is_available: day !== "saturday" && day !== "sunday", // Mon-Fri available by default
+    }));
+
+    setAvailableDays(defaultDays);
+
+    // IMPORTANT: Update user state with the availability data
+    setUser((prev) => ({
+      ...prev,
+      available_days: defaultDays,
+    }));
+  };
+
+  // ======================================================
   // HANDLE CHANGE
   // ======================================================
 
@@ -147,10 +206,33 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   ) => {
     const { name, value } = e.target;
 
-    setUser((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setUser((prev) => {
+      const updated = {
+        ...prev,
+        [name]: value,
+      };
+
+      // Auto-initialize availability when switching to EXPERT role
+      if (name === "role" && value === "EXPERT") {
+        // Only initialize if there are no availability days set yet
+        if (!prev.available_days || prev.available_days.length === 0) {
+          const defaultDays: AvailableDay[] = DAYS_OF_WEEK.map((day) => ({
+            day,
+            time_slots: [{ start_time: "09:00", end_time: "18:00" }],
+            is_available: day !== "saturday" && day !== "sunday",
+          }));
+
+          setAvailableDays(defaultDays);
+
+          return {
+            ...updated,
+            available_days: defaultDays,
+          };
+        }
+      }
+
+      return updated;
+    });
 
     if (errors[name as keyof UserValidationErrors]) {
       setErrors((prev) => ({
@@ -181,6 +263,109 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ======================================================
+  // HANDLE DAY CHANGE
+  // ======================================================
+
+  const handleDayChange = (dayIndex: number, field: string, value: any) => {
+    setAvailableDays((prevDays) => {
+      const updatedDays = [...prevDays];
+      (updatedDays[dayIndex] as any)[field] = value;
+
+      // Update user state
+      setUser((prev) => ({
+        ...prev,
+        available_days: updatedDays,
+      }));
+
+      return updatedDays;
+    });
+  };
+
+  // ======================================================
+  // HANDLE TIME SLOT CHANGE
+  // ======================================================
+
+  const handleTimeSlotChange = (
+    dayIndex: number,
+    slotIndex: number,
+    field: string,
+    value: string,
+  ) => {
+    setAvailableDays((prevDays) => {
+      const updatedDays = [...prevDays];
+      (updatedDays[dayIndex].time_slots[slotIndex] as any)[field] = value;
+
+      // Update user state
+      setUser((prev) => ({
+        ...prev,
+        available_days: updatedDays,
+      }));
+
+      return updatedDays;
+    });
+  };
+
+  // ======================================================
+  // ADD TIME SLOT
+  // ======================================================
+
+  const addTimeSlot = (dayIndex: number) => {
+    setAvailableDays((prevDays) => {
+      const updatedDays = [...prevDays];
+      updatedDays[dayIndex].time_slots.push({
+        start_time: "09:00",
+        end_time: "18:00",
+      });
+
+      // Update user state
+      setUser((prev) => ({
+        ...prev,
+        available_days: updatedDays,
+      }));
+
+      return updatedDays;
+    });
+  };
+
+  // ======================================================
+  // REMOVE TIME SLOT
+  // ======================================================
+
+  const removeTimeSlot = (dayIndex: number, slotIndex: number) => {
+    setAvailableDays((prevDays) => {
+      const updatedDays = [...prevDays];
+      updatedDays[dayIndex].time_slots.splice(slotIndex, 1);
+
+      // Update user state
+      setUser((prev) => ({
+        ...prev,
+        available_days: updatedDays,
+      }));
+
+      return updatedDays;
+    });
+  };
+
+  // ======================================================
+  // TOGGLE DAY AVAILABILITY
+  // ======================================================
+
+  const toggleDayAvailability = (dayIndex: number) => {
+    setAvailableDays((prevDays) => {
+      const updatedDays = [...prevDays];
+      updatedDays[dayIndex].is_available = !updatedDays[dayIndex].is_available;
+
+      // Update user state
+      setUser((prev) => ({
+        ...prev,
+        available_days: updatedDays,
+      }));
+
+      return updatedDays;
+    });
+  };
+
+  // ======================================================
   // ADD CATEGORY
   // ======================================================
 
@@ -196,11 +381,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    // Check for duplicate categories
+    const isDuplicate = (user.expert_categories || []).some(
+      (cat) =>
+        cat.name.toLowerCase() === categoryInput.name.trim().toLowerCase(),
+    );
+
+    if (isDuplicate) {
+      setCategoryErrors({ name: "This category already exists." });
+      return;
+    }
+
     setUser((prev) => ({
       ...prev,
       expert_categories: [
         ...(prev.expert_categories || []),
-        { ...categoryInput },
+        {
+          name: categoryInput.name.trim(),
+          description: categoryInput.description?.trim() || "",
+        },
       ],
     }));
 
@@ -237,7 +436,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setErrors({});
     setSelectedUser(null);
     resetCategoryInput();
+    setAvailableDays([]);
   };
+
+  // ======================================================
+  // SET SELECTED USER
+  // ======================================================
 
   // ======================================================
   // SET SELECTED USER
@@ -245,6 +449,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const setSelectedUserData = (selected: User) => {
     setSelectedUser(selected);
+
+    // If editing an expert with no availability, initialize default
+    let userAvailableDays = selected.available_days || [];
+
+    if (selected.role === "EXPERT" && userAvailableDays.length === 0) {
+      userAvailableDays = DAYS_OF_WEEK.map((day) => ({
+        day,
+        time_slots: [{ start_time: "09:00", end_time: "18:00" }],
+        is_available: day !== "saturday" && day !== "sunday",
+      }));
+    }
+
+    setAvailableDays(userAvailableDays);
 
     setUser({
       name: selected.name,
@@ -254,6 +471,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       password: "",
       role: selected.role,
       expert_categories: selected.expert_categories || [],
+      available_days: userAvailableDays, // Include availability with defaults
       created_by: selected.created_by,
     });
 
@@ -266,7 +484,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   // ======================================================
 
   const addUser = async (): Promise<boolean> => {
-    const validationErrors = validateUser(user);
+    // Ensure available_days is included for EXPERT role
+    const payload = { ...user };
+
+    if (payload.role === "EXPERT") {
+      // Make sure available_days is set
+      if (!payload.available_days || payload.available_days.length === 0) {
+        payload.available_days = availableDays;
+      }
+    }
+
+    const validationErrors = validateUser(payload);
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -275,12 +503,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setLoading(true);
-      await UserService.addUser(user);
+      console.log("Sending payload:", JSON.stringify(payload, null, 2)); // Debug log
+      await UserService.addUser(payload);
       await getUsers();
       resetForm();
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding user:", error);
+      if (error.response?.data?.message) {
+        setErrors({ email: error.response.data.message });
+      }
       return false;
     } finally {
       setLoading(false);
@@ -304,6 +536,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ======================================================
+  // GET EXPERT BY ID
+  // ======================================================
+
+  const getExpertById = async (
+    user_generated_id: string,
+  ): Promise<User | null> => {
+    try {
+      setLoading(true);
+      const response = await UserService.getExpertById(user_generated_id);
+      return response.data || null;
+    } catch (error) {
+      console.error("Error fetching expert by ID:", error);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
   // GET EXPERTS BY CATEGORY
   // ======================================================
 
@@ -314,6 +565,27 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       return response.data || [];
     } catch (error) {
       console.error("Error fetching experts by category:", error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // GET EXPERTS BY CATEGORY ID
+  // ======================================================
+
+  const getExpertsByCategoryId = async (
+    category_generated_id: string,
+  ): Promise<User[]> => {
+    try {
+      setLoading(true);
+      const response = await UserService.getExpertsByCategoryId(
+        category_generated_id,
+      );
+      return response.data || [];
+    } catch (error) {
+      console.error("Error fetching experts by category ID:", error);
       return [];
     } finally {
       setLoading(false);
@@ -333,17 +605,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         await UserService.getUserByGeneratedId(user_generated_id);
 
       if (response.data) {
-        setSelectedUser(response.data);
-        setUser({
-          name: response.data.name,
-          email: response.data.email,
-          phone_number: response.data.phone_number,
-          user_id: response.data.user_id,
-          password: "",
-          role: response.data.role,
-          expert_categories: response.data.expert_categories || [],
-          created_by: response.data.created_by,
-        });
+        setSelectedUserData(response.data);
       }
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -361,7 +623,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
 
-    const validationErrors = validateUser(user);
+    // Ensure available_days is included for EXPERT role
+    const payload: UpdateUserPayload = { ...user };
+
+    if (payload.role === "EXPERT") {
+      if (!payload.available_days || payload.available_days.length === 0) {
+        payload.available_days = availableDays;
+      }
+    }
+
+    const validationErrors = validateUser(payload);
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -370,13 +641,35 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setLoading(true);
-      const payload: UpdateUserPayload = { ...user };
+      console.log("Updating payload:", JSON.stringify(payload, null, 2)); // Debug log
       await UserService.updateUser(selectedUser.user_generated_id!, payload);
       await getUsers();
       resetForm();
       return true;
     } catch (error) {
       console.error("Error updating user:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // UPDATE EXPERT AVAILABILITY
+  // ======================================================
+
+  const updateExpertAvailability = async (
+    user_generated_id: string,
+    available_days: AvailableDay[],
+  ): Promise<boolean> => {
+    try {
+      setLoading(true);
+      await UserService.updateExpertAvailability(user_generated_id, {
+        available_days,
+      });
+      return true;
+    } catch (error) {
+      console.error("Error updating expert availability:", error);
       return false;
     } finally {
       setLoading(false);
@@ -496,6 +789,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     selectedUser,
     categoryInput,
     categoryErrors,
+    availableDays,
+    currentDay,
+    currentTimeSlot,
 
     setSelectedUserData,
     handleChange,
@@ -505,11 +801,22 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     resetForm,
     resetCategoryInput,
 
+    // Availability management
+    handleDayChange,
+    handleTimeSlotChange,
+    addTimeSlot,
+    removeTimeSlot,
+    toggleDayAvailability,
+    initializeDefaultAvailability,
+
     addUser,
     getUsers,
+    getExpertById,
     getExpertsByCategory,
+    getExpertsByCategoryId,
     getUserByGeneratedId,
     updateUser,
+    updateExpertAvailability,
     deleteUser,
     addExpertCategory,
     removeExpertCategory,
