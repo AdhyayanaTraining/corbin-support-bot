@@ -12,6 +12,7 @@ export interface UserValidationErrors {
   password?: string;
   role?: string;
   expert_categories?: string;
+  available_days?: string;
   created_by?: string;
 }
 
@@ -38,6 +39,8 @@ export function validateUser(
 
   if (!userData.email.trim()) {
     errors.email = "Email is required.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email.trim())) {
+    errors.email = "Please enter a valid email address.";
   }
 
   // ======================================================
@@ -62,6 +65,8 @@ export function validateUser(
 
   if (!userData.password.trim()) {
     errors.password = "Password is required.";
+  } else if (userData.password.trim().length < 6) {
+    errors.password = "Password must be at least 6 characters long.";
   }
 
   // ======================================================
@@ -88,6 +93,32 @@ export function validateUser(
       userData.expert_categories.forEach((category, index) => {
         if (!category.name.trim()) {
           errors.expert_categories = `Category name is required at position ${index + 1}.`;
+        }
+      });
+    }
+
+    // ======================================================
+    // VALIDATE AVAILABLE DAYS (OPTIONAL)
+    // ======================================================
+
+    if (userData.available_days && userData.available_days.length > 0) {
+      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+
+      userData.available_days.forEach((day, dayIndex) => {
+        if (!day.time_slots || day.time_slots.length === 0) {
+          errors.available_days = `Time slots are required for ${day.day}.`;
+        } else {
+          day.time_slots.forEach((slot, slotIndex) => {
+            if (!timeRegex.test(slot.start_time)) {
+              errors.available_days = `Invalid start time format for ${day.day} slot ${slotIndex + 1}. Use HH:MM format.`;
+            }
+            if (!timeRegex.test(slot.end_time)) {
+              errors.available_days = `Invalid end time format for ${day.day} slot ${slotIndex + 1}. Use HH:MM format.`;
+            }
+            if (slot.start_time >= slot.end_time) {
+              errors.available_days = `Start time must be before end time for ${day.day} slot ${slotIndex + 1}.`;
+            }
+          });
         }
       });
     }

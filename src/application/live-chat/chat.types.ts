@@ -23,13 +23,15 @@ export type MessageType = "TEXT" | "IMAGE" | "FILE";
 export interface ChatConversation {
   conversation_generated_id: string;
 
+  visitor_generated_id: string;
+
   visitor_name: string;
 
   visitor_email: string;
 
   visitor_phone_number?: string;
 
-  visitor_generated_id: string;
+  category_generated_id: string;
 
   category_name: string;
 
@@ -67,7 +69,7 @@ export interface ChatMessage {
 
   sender: MessageSender;
 
-  sender_generated_id?: string;
+  sender_generated_id: string;
 
   message: string;
 
@@ -83,18 +85,19 @@ export interface ChatMessage {
 // ======================================================
 
 export interface CreateConversationPayload {
+  visitor_generated_id: string;
+
   visitor_name: string;
 
   visitor_email: string;
 
   visitor_phone_number?: string;
 
-  visitor_generated_id: string;
-
   category_generated_id: string;
 
   category_name: string;
 }
+
 // ======================================================
 // SEND MESSAGE PAYLOAD
 // ======================================================
@@ -104,7 +107,7 @@ export interface SendMessagePayload {
 
   sender: MessageSender;
 
-  sender_generated_id?: string;
+  sender_generated_id: string;
 
   message: string;
 
@@ -116,13 +119,13 @@ export interface SendMessagePayload {
 // ======================================================
 
 export const EMPTY_CONVERSATION: CreateConversationPayload = {
+  visitor_generated_id: "",
+
   visitor_name: "",
 
   visitor_email: "",
 
   visitor_phone_number: "",
-
-  visitor_generated_id: "",
 
   category_generated_id: "",
 

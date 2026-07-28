@@ -11,6 +11,8 @@ export interface ChatValidationErrors {
 
   visitor_phone_number?: string;
 
+  visitor_generated_id?: string;
+
   category_generated_id?: string;
 
   message?: string;
@@ -30,6 +32,14 @@ export function validateConversation(
   conversation: CreateConversationPayload,
 ): ChatValidationErrors {
   const errors: ChatValidationErrors = {};
+
+  // ======================================================
+  // Visitor Generated ID
+  // ======================================================
+
+  if (!conversation.visitor_generated_id.trim()) {
+    errors.visitor_generated_id = "Visitor ID is required.";
+  }
 
   // ======================================================
   // Visitor Name
@@ -72,11 +82,19 @@ export function validateMessage(
   const errors: ChatValidationErrors = {};
 
   // ======================================================
-  // Conversation
+  // Conversation ID
   // ======================================================
 
   if (!message.conversation_generated_id.trim()) {
     throw new Error("Conversation ID is required.");
+  }
+
+  // ======================================================
+  // Sender ID
+  // ======================================================
+
+  if (!message.sender_generated_id.trim()) {
+    throw new Error("Sender ID is required.");
   }
 
   // ======================================================
