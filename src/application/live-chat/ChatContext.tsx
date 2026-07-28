@@ -222,6 +222,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setMessage((prev) => ({
       ...prev,
       conversation_generated_id: conversation.conversation_generated_id,
+      sender: "VISITOR",
+      sender_generated_id: conversation.visitor_generated_id,
     }));
   };
 
@@ -287,6 +289,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setMessage((prev) => ({
       ...EMPTY_MESSAGE,
       conversation_generated_id: prev.conversation_generated_id,
+      sender: prev.sender,
+      sender_generated_id: prev.sender_generated_id,
     }));
   };
 
@@ -317,8 +321,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setMessage((prev) => ({
           ...prev,
           conversation_generated_id: response.data.conversation_generated_id,
+          sender: "VISITOR",
+          sender_generated_id: payload.visitor_generated_id,
         }));
-
         return true;
       }
 
@@ -450,7 +455,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
-
         return false;
       }
 
@@ -459,17 +463,17 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       const response = await ChatService.sendMessage(message);
 
       if (response.success) {
-        // Don't add message to state here - let socket listener handle it
-        // to prevent duplicate messages
         resetMessage();
+
+        // TEMPORARY
+        await getConversationMessages(message.conversation_generated_id);
 
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error("Failed to send message.", error);
-
+      console.error(error);
       return false;
     } finally {
       setLoading(false);

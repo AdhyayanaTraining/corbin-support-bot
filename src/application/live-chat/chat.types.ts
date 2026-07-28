@@ -29,7 +29,7 @@ export interface ChatConversation {
 
   visitor_phone_number?: string;
 
-  category_generated_id: string;
+  visitor_generated_id: string;
 
   category_name: string;
 
@@ -89,11 +89,12 @@ export interface CreateConversationPayload {
 
   visitor_phone_number?: string;
 
+  visitor_generated_id: string;
+
   category_generated_id: string;
 
   category_name: string;
 }
-
 // ======================================================
 // SEND MESSAGE PAYLOAD
 // ======================================================
@@ -120,6 +121,8 @@ export const EMPTY_CONVERSATION: CreateConversationPayload = {
   visitor_email: "",
 
   visitor_phone_number: "",
+
+  visitor_generated_id: "",
 
   category_generated_id: "",
 
