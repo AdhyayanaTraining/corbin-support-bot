@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/preserve-manual-memoization */
+/* eslint-disable react-hooks/immutability */
 // // /* eslint-disable react-hooks/set-state-in-effect */
 // // /* eslint-disable @typescript-eslint/no-explicit-any */
 // /* eslint-disable react-hooks/set-state-in-effect */
@@ -1787,7 +1789,8 @@ import {
   ClipboardList,
   Users,
   MessageSquare,
-  Tag,
+  Clock,
+  CheckCheck,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -1795,10 +1798,6 @@ import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github.css";
 import "./style.css";
 
-// ------------------------------------------------------------------
-// Contexts
-// ------------------------------------------------------------------
-import { TopicProvider, useTopic } from "@/src/application/topics/TopicContext";
 import { FAQProvider, useFAQ } from "@/src/application/faq/FaqContext";
 import {
   ChatbotProvider,
@@ -1838,10 +1837,10 @@ type FlowStep =
   | "faq-questions"
   | "mentor-form"
   | "mentor-options"
+  | "post-chat-options"
   | "query-form"
   | "live-chat"
   | "mentor-topics"
-  | "mentor-experts"
   | "mentor-chat";
 
 type MentorFormStep = "name" | "mobile" | "email";
@@ -1865,8 +1864,8 @@ const MENTOR_STEPS: {
 
 const isValidName = (v: string) => v.trim().length >= 2;
 const isValidMobile = (v: string) => {
-  const digits = v.replace(/\D/g, "");
-  return digits.length >= 7 && digits.length <= 15;
+  const d = v.replace(/\D/g, "");
+  return d.length >= 7 && d.length <= 15;
 };
 const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
@@ -1903,10 +1902,6 @@ function ChatWidgetInner() {
     addRequestQuery,
     resetForm: resetRequestQueryForm,
   } = useRequestQuery();
-
-  // =====================================================
-  // UPDATED: Destructure new context methods
-  // =====================================================
   const {
     messages: mentorMessages,
     conversations,
@@ -1914,35 +1909,22 @@ function ChatWidgetInner() {
     message: mentorMessage,
     errors: mentorErrors,
     loading: mentorLoading,
-
     setSelectedConversation,
-
-    handleConversationChange,
     handleMessageChange: handleMentorMessageChange,
-
     resetConversation: resetMentorConversation,
     resetMessage: resetMentorMessage,
-
     createConversation,
-
     getVisitorConversations,
-
     sendMessage: sendMentorMessage,
-
     getConversationMessages,
-
     joinRoom,
     leaveRoom,
   } = useChat();
-
-  // =====================================================
-  // UPDATED: Include getExpertsByCategoryId from UserContext
-  // =====================================================
   const {
     expertCategories,
     getExpertCategories,
-    getExpertsByCategory, // Search by category NAME
-    getExpertsByCategoryId, // Search by category ID (NEW)
+    getExpertsByCategory,
+    getExpertsByCategoryId,
     loading: expertsLoading,
   } = useUser();
 
@@ -1953,7 +1935,6 @@ function ChatWidgetInner() {
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [flowStep, setFlowStep] = useState<FlowStep>("faq-list");
-
   const [selectedFAQ, setSelectedFAQ] = useState<FAQ | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FAQCategory | null>(
     null,
@@ -1961,30 +1942,29 @@ function ChatWidgetInner() {
   const [selectedQuestion, setSelectedQuestion] = useState<FAQQuestion | null>(
     null,
   );
-
   const [mentorForm, setMentorForm] = useState<ContactDetails>({
     name: "",
     mobile: "",
     email: "",
+    registered_employee_generated_id: "",
   });
   const [mentorFormStep, setMentorFormStep] = useState<MentorFormStep>("name");
   const [formError, setFormError] = useState<string | null>(null);
   const [savedContact, setSavedContact] = useState<ContactDetails | null>(null);
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [submitTrigger, setSubmitTrigger] = useState(0);
+  const [waitingForEmployeeId, setWaitingForEmployeeId] = useState(false);
   const pendingContactRef = useRef<ContactDetails | null>(null);
   const [querySubmitTrigger, setQuerySubmitTrigger] = useState(0);
-  const [mentorExperts, setMentorExperts] = useState<ExpertUser[]>([]);
+  const [autoSelectedExpert, setAutoSelectedExpert] =
+    useState<ExpertUser | null>(null);
   const [selectedExpertCategory, setSelectedExpertCategory] =
     useState<ExpertCategory | null>(null);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSavedContact = useRef(false);
+  const [conversationEnded, setConversationEnded] = useState(false);
 
-  // =====================================================
-  // Load saved contact AND fetch visitor conversations
-  // =====================================================
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(CONTACT_STORAGE_KEY);
@@ -1999,46 +1979,51 @@ function ChatWidgetInner() {
               parsed.registered_employee_generated_id || "",
           };
           setSavedContact(contact);
-
-          // Fetch visitor conversations after loading saved contact
-          if (contact.registered_employee_generated_id) {
+          if (contact.registered_employee_generated_id)
             getVisitorConversations(contact.registered_employee_generated_id);
-          }
         }
       }
-    } catch (err) {
-      console.error("Error loading saved contact:", err);
-    }
+    } catch (err) {}
   }, []);
 
-  // =====================================================
-  // Restore active conversation automatically
-  // =====================================================
+  // Restore latest conversation (including CLOSED)
   useEffect(() => {
     if (!conversations || conversations.length === 0) return;
-    if (flowStep === "mentor-chat") return; // Already in chat
-
-    const existingConversation = conversations.find(
-      (c) => c.status === "WAITING" || c.status === "ACTIVE",
-    );
-
-    if (existingConversation) {
-      setSelectedConversation(existingConversation);
-      getConversationMessages(existingConversation.conversation_generated_id);
+    if (flowStep === "mentor-chat") return;
+    const latestConversation = [...conversations].sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )[0];
+    if (latestConversation) {
+      setSelectedConversation(latestConversation);
+      getConversationMessages(latestConversation.conversation_generated_id);
+      if (latestConversation.status === "CLOSED") {
+        setConversationEnded(true);
+      }
       setFlowStep("mentor-chat");
     }
   }, [conversations]);
 
+  // Watch for conversation close
+  useEffect(() => {
+    if (
+      selectedConversation?.status === "CLOSED" &&
+      flowStep === "mentor-chat"
+    ) {
+      setConversationEnded(true);
+      pushMessage("bot", "This conversation has been ended by the mentor.");
+      simulateTyping("Do you have any more questions I can help with?");
+    }
+  }, [selectedConversation?.status]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping, flowStep, chatbotMessages, mentorMessages]);
-
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, []);
-
   useEffect(() => {
     if (!isEmbedded) return;
     window.parent.postMessage(
@@ -2046,19 +2031,13 @@ function ChatWidgetInner() {
       "*",
     );
   }, [isOpen, isEmbedded]);
-
-  // =====================================================
-  // Auto-load messages when selectedConversation changes
-  // =====================================================
   useEffect(() => {
-    const conversationId = selectedConversation?.conversation_generated_id;
-    if (flowStep !== "mentor-chat" || !conversationId) return;
-
-    joinRoom(conversationId);
-    getConversationMessages(conversationId);
-
+    const cid = selectedConversation?.conversation_generated_id;
+    if (flowStep !== "mentor-chat" || !cid) return;
+    joinRoom(cid);
+    getConversationMessages(cid);
     return () => {
-      leaveRoom(conversationId);
+      leaveRoom(cid);
     };
   }, [flowStep, selectedConversation?.conversation_generated_id]);
 
@@ -2068,7 +2047,6 @@ function ChatWidgetInner() {
       { id: `${Date.now()}-${sender}-${Math.random()}`, sender, text },
     ]);
   }, []);
-
   const simulateTyping = useCallback(
     (text: string, delay = 550) => {
       setIsTyping(true);
@@ -2081,39 +2059,17 @@ function ChatWidgetInner() {
   );
 
   useEffect(() => {
-    if (submitTrigger === 0) return;
-    if (hasSavedContact.current) return;
-
-    let cancelled = false;
+    if (submitTrigger === 0 || hasSavedContact.current) return;
+    let c = false;
     hasSavedContact.current = true;
     setIsSavingContact(true);
-
     (async () => {
-      const success = await addWebsiteUser();
-      if (cancelled) return;
-      const contact = pendingContactRef.current;
+      const ok = await addWebsiteUser();
+      if (c) return;
       setIsSavingContact(false);
-
-      if (success && contact) {
-        const updatedContact: ContactDetails = {
-          ...contact,
-          registered_employee_generated_id: registeredEmployeeId || "",
-        };
-        console.log("Registered Employee ID:", registeredEmployeeId);
-        console.log("Updated Contact:", updatedContact);
-        setSavedContact(updatedContact);
-        try {
-          window.localStorage.setItem(
-            CONTACT_STORAGE_KEY,
-            JSON.stringify(updatedContact),
-          );
-        } catch (err) {}
+      if (ok) {
+        setWaitingForEmployeeId(true);
         setIsTyping(false);
-        pushMessage(
-          "bot",
-          `Thanks, **${contact.name}**! I've saved your details.\n\nHow would you like to proceed?`,
-        );
-        setFlowStep("mentor-options");
       } else {
         setIsTyping(false);
         pushMessage(
@@ -2123,34 +2079,50 @@ function ChatWidgetInner() {
         setMentorFormStep("email");
         setDraft("");
         setFlowStep("mentor-form");
+        hasSavedContact.current = false;
       }
-      hasSavedContact.current = false;
     })();
-
     return () => {
-      cancelled = true;
+      c = true;
     };
   }, [submitTrigger]);
-
+  useEffect(() => {
+    if (!waitingForEmployeeId || !registeredEmployeeId) return;
+    const contact = pendingContactRef.current;
+    if (!contact) return;
+    const updated: ContactDetails = {
+      ...contact,
+      registered_employee_generated_id: registeredEmployeeId,
+    };
+    setSavedContact(updated);
+    try {
+      window.localStorage.setItem(CONTACT_STORAGE_KEY, JSON.stringify(updated));
+    } catch (err) {}
+    pushMessage(
+      "bot",
+      `Thanks, **${contact.name}**! I've saved your details.\n\nHow would you like to proceed?`,
+    );
+    setFlowStep("mentor-options");
+    setWaitingForEmployeeId(false);
+    hasSavedContact.current = false;
+  }, [waitingForEmployeeId, registeredEmployeeId]);
   useEffect(() => {
     if (querySubmitTrigger === 0) return;
-    let cancelled = false;
+    let c = false;
     (async () => {
-      const success = await addRequestQuery();
-      if (cancelled) return;
-      if (success) {
-        const ticketRef = `TKT-${Date.now().toString(36).toUpperCase()}`;
+      const ok = await addRequestQuery();
+      if (c) return;
+      if (ok) {
         pushMessage(
           "bot",
-          `Your query has been registered!\n\nTicket: **${ticketRef}**`,
+          `Your query has been registered!\n\nTicket: **TKT-${Date.now().toString(36).toUpperCase()}**`,
         );
         setFlowStep("faq-list");
-      } else {
+      } else
         pushMessage("bot", "I couldn't submit your query — please try again.");
-      }
     })();
     return () => {
-      cancelled = true;
+      c = true;
     };
   }, [querySubmitTrigger]);
 
@@ -2160,9 +2132,8 @@ function ChatWidgetInner() {
     if (
       flowStep === "mentor-chat" &&
       selectedConversation?.conversation_generated_id
-    ) {
+    )
       leaveRoom(selectedConversation.conversation_generated_id);
-    }
     setFlowStep("faq-list");
     setSelectedFAQ(null);
     setSelectedCategory(null);
@@ -2176,12 +2147,14 @@ function ChatWidgetInner() {
     setMentorFormStep("name");
     setFormError(null);
     setDraft("");
+    setWaitingForEmployeeId(false);
+    setConversationEnded(false);
+    setAutoSelectedExpert(null);
     resetChatbotForm();
     resetWebsiteUserForm();
     resetRequestQueryForm();
     resetMentorConversation();
     resetMentorMessage();
-    setMentorExperts([]);
     setSelectedExpertCategory(null);
     setMessages([welcomeMessage()]);
   }, [
@@ -2203,36 +2176,37 @@ function ChatWidgetInner() {
       setFlowStep("faq-list");
       setSelectedFAQ(null);
       setSelectedCategory(null);
-      pushMessage("user", "Back to questions");
+      pushMessage("user", "Back");
       simulateTyping("Here are the FAQ questions again:");
     } else if (flowStep === "faq-questions") {
       setFlowStep("faq-categories");
       setSelectedCategory(null);
       setSelectedQuestion(null);
-      pushMessage("user", "Back to categories");
+      pushMessage("user", "Back");
       simulateTyping("Here are the categories again:");
     } else if (flowStep === "query-form") {
       resetRequestQueryForm();
+      setFlowStep("post-chat-options");
+      pushMessage("user", "Back");
+      simulateTyping("How would you like to proceed?");
+    } else if (flowStep === "post-chat-options") {
       setFlowStep("mentor-options");
       pushMessage("user", "Back");
-      simulateTyping("No problem — how would you like to proceed?");
+      simulateTyping("How would you like to proceed?");
     } else if (flowStep === "mentor-topics") {
       setFlowStep("mentor-options");
       pushMessage("user", "Back");
       simulateTyping("How would you like to proceed?");
-    } else if (flowStep === "mentor-experts") {
-      setMentorExperts([]);
-      setFlowStep("mentor-topics");
-      pushMessage("user", "Back");
-      simulateTyping("Which topic would you like to talk to a mentor about?");
     } else if (flowStep === "mentor-chat") {
       if (selectedConversation?.conversation_generated_id)
         leaveRoom(selectedConversation.conversation_generated_id);
       resetMentorConversation();
       resetMentorMessage();
-      setFlowStep("mentor-experts");
+      setConversationEnded(false);
+      setAutoSelectedExpert(null);
+      setFlowStep("mentor-topics");
       pushMessage("user", "Back");
-      simulateTyping("Choose another mentor, or pick a different topic.");
+      simulateTyping("Choose another topic.");
     } else if (
       flowStep === "mentor-form" ||
       flowStep === "mentor-options" ||
@@ -2252,10 +2226,6 @@ function ChatWidgetInner() {
     resetRequestQueryForm,
   ]);
 
-  // =====================================================
-  // FAQ FLOW: FAQ → Categories → Questions → Answer
-  // =====================================================
-
   const handleFaqSelect = useCallback(
     (faq: FAQ) => {
       setSelectedFAQ(faq);
@@ -2263,72 +2233,52 @@ function ChatWidgetInner() {
       setSelectedQuestion(null);
       setFlowStep("faq-categories");
       pushMessage("user", faq.faq_default_question);
-      const categories = faq.categories || [];
-      if (categories.length > 0) {
-        simulateTyping(
-          `Here are the categories under **"${faq.faq_default_question}"**:`,
-        );
-      } else {
-        simulateTyping("No categories added yet for this FAQ question.");
-      }
+      (faq.categories || []).length > 0
+        ? simulateTyping("Here are the categories:")
+        : simulateTyping("No categories yet.");
     },
     [pushMessage, simulateTyping],
   );
-
   const handleCategorySelect = useCallback(
-    (category: FAQCategory) => {
-      setSelectedCategory(category);
+    (cat: FAQCategory) => {
+      setSelectedCategory(cat);
       setSelectedQuestion(null);
       setFlowStep("faq-questions");
-      pushMessage("user", category.topic_name || "Category");
-      const questions = category.questions || [];
-      if (questions.length > 0) {
-        simulateTyping(
-          `Here are the questions under **${category.topic_name || "this category"}**:`,
-        );
-      } else {
-        simulateTyping("No questions added yet for this category.");
-      }
+      pushMessage("user", cat.topic_name || "Category");
+      (cat.questions || []).length > 0
+        ? simulateTyping("Here are the questions:")
+        : simulateTyping("No questions yet.");
     },
     [pushMessage, simulateTyping],
   );
-
   const handleQuestionSelect = useCallback(
-    (question: FAQQuestion) => {
-      setSelectedQuestion(question);
-      pushMessage("user", question.question_text);
-      const answers = question.answers || [];
-      if (answers.length > 0) {
-        const combined = answers
-          .map((a) => a.answer_text)
-          .filter(Boolean)
-          .join("\n\n");
-        simulateTyping(combined || "Here's the answer:");
-      } else {
-        simulateTyping(
-          "I don't have a written answer for this one yet — you can contact our support team below.",
-        );
-      }
+    (q: FAQQuestion) => {
+      setSelectedQuestion(q);
+      pushMessage("user", q.question_text);
+      const answers = q.answers || [];
+      answers.length > 0
+        ? simulateTyping(
+            answers
+              .map((a) => a.answer_text)
+              .filter(Boolean)
+              .join("\n\n"),
+          )
+        : simulateTyping("No answer yet — contact support below.");
     },
     [pushMessage, simulateTyping],
   );
 
-  // =====================================================
-  // Check for active conversation before showing options
-  // =====================================================
   const handleShowSatisfaction = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     pushMessage("user", "I need more help");
-
     if (savedContact) {
-      // Check if there's an active conversation
       if (selectedConversation && selectedConversation.status !== "CLOSED") {
         setIsTyping(true);
         typingTimeoutRef.current = setTimeout(() => {
           setIsTyping(false);
           pushMessage(
             "bot",
-            `Welcome back, **${savedContact.name}**! Resuming your conversation.`,
+            `Welcome back, **${savedContact.name}**! Resuming...`,
           );
           setFlowStep("mentor-chat");
         }, 550);
@@ -2336,25 +2286,23 @@ function ChatWidgetInner() {
         setIsTyping(true);
         typingTimeoutRef.current = setTimeout(() => {
           setIsTyping(false);
-          pushMessage(
-            "bot",
-            `Welcome back, **${savedContact.name}**! How would you like to proceed?`,
-          );
+          pushMessage("bot", `Welcome back, **${savedContact.name}**!`);
           setMentorForm(savedContact);
           setFlowStep("mentor-options");
         }, 550);
       }
       return;
     }
-
     setIsTyping(true);
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      pushMessage(
-        "bot",
-        "No worries — let's get you help. First, what's your **full name**?",
-      );
-      setMentorForm({ name: "", mobile: "", email: "" });
+      pushMessage("bot", "What's your **full name**?");
+      setMentorForm({
+        name: "",
+        mobile: "",
+        email: "",
+        registered_employee_generated_id: "",
+      });
       setMentorFormStep("name");
       setFormError(null);
       setDraft("");
@@ -2364,6 +2312,7 @@ function ChatWidgetInner() {
 
   const handleEditContact = useCallback(() => {
     setSavedContact(null);
+    setWaitingForEmployeeId(false);
     try {
       window.localStorage.removeItem(CONTACT_STORAGE_KEY);
     } catch (err) {}
@@ -2398,14 +2347,12 @@ function ChatWidgetInner() {
       setMentorForm((p) => ({ ...p, name: text }));
       setMentorFormStep("mobile");
       setDraft("");
-      simulateTyping(
-        `Nice to meet you, **${text}**! What's your **mobile number**?`,
-      );
+      simulateTyping(`Nice to meet you, **${text}**! Mobile number?`);
       return;
     }
     if (mentorFormStep === "mobile") {
       if (!isValidMobile(text)) {
-        setFormError("Enter a valid mobile number.");
+        setFormError("Enter valid mobile.");
         return;
       }
       setFormError(null);
@@ -2413,11 +2360,11 @@ function ChatWidgetInner() {
       setMentorForm((p) => ({ ...p, mobile: text }));
       setMentorFormStep("email");
       setDraft("");
-      simulateTyping("What's your **email address**?");
+      simulateTyping("Email address?");
       return;
     }
     if (!isValidEmail(text)) {
-      setFormError("Enter a valid email.");
+      setFormError("Enter valid email.");
       return;
     }
     setFormError(null);
@@ -2453,24 +2400,24 @@ function ChatWidgetInner() {
   ]);
 
   const handleChatWithBot = useCallback(() => {
-    const contact = savedContact ?? mentorForm;
+    const c = savedContact ?? mentorForm;
     pushMessage("user", "Chat with Bot");
     simulateTyping(
-      `You're through to CareBot AI, **${contact.name}**. Ask me anything.`,
+      `You're through to CareBot AI, **${c.name}**. Ask me anything.`,
     );
     setFlowStep("live-chat");
   }, [savedContact, mentorForm, pushMessage, simulateTyping]);
 
   const handleStartQueryForm = useCallback(() => {
-    const contact = savedContact ?? mentorForm;
+    const c = savedContact ?? mentorForm;
     handleRequestQueryChange({
-      target: { name: "name", value: contact.name },
+      target: { name: "name", value: c.name },
     } as ChangeEvent<HTMLInputElement>);
     handleRequestQueryChange({
-      target: { name: "email", value: contact.email },
+      target: { name: "email", value: c.email },
     } as ChangeEvent<HTMLInputElement>);
     handleRequestQueryChange({
-      target: { name: "phone_number", value: contact.mobile },
+      target: { name: "phone_number", value: c.mobile },
     } as ChangeEvent<HTMLInputElement>);
     handleRequestQueryChange({
       target: { name: "query_title", value: "" },
@@ -2479,7 +2426,7 @@ function ChatWidgetInner() {
       target: { name: "query_description", value: "" },
     } as ChangeEvent<HTMLTextAreaElement>);
     pushMessage("user", "Raise a Query");
-    simulateTyping("Give me a title and details, I'll log it for our team.");
+    simulateTyping("Give me a title and details.");
     setFlowStep("query-form");
   }, [
     savedContact,
@@ -2489,95 +2436,89 @@ function ChatWidgetInner() {
     handleRequestQueryChange,
   ]);
 
-  // =====================================================
-  // Prevent reconnect if already chatting
-  // =====================================================
+  // Handle "No" after conversation ends
+  const handleNoMoreQuestions = useCallback(() => {
+    pushMessage("user", "No, that's all");
+    simulateTyping(
+      "Thank you for chatting with us! If you need any help in the future, don't hesitate to reach out. Have a great day! 😊",
+    );
+    setTimeout(() => {
+      setFlowStep("faq-list");
+    }, 2000);
+  }, [pushMessage, simulateTyping]);
+
+  // Handle "Yes" after conversation ends - show options
+  const handleYesMoreQuestions = useCallback(() => {
+    pushMessage("user", "Yes, I have more questions");
+    simulateTyping(
+      "Sure! How would you like to proceed? You can chat with our AI bot or raise a query if you're not satisfied.",
+    );
+    setFlowStep("post-chat-options");
+  }, [pushMessage, simulateTyping]);
+
   const handleShowMentorTopics = useCallback(async () => {
-    // If already in active conversation, resume it
     if (selectedConversation && selectedConversation.status !== "CLOSED") {
       pushMessage("user", "Talk to a Mentor");
       simulateTyping("Resuming your conversation...");
       setFlowStep("mentor-chat");
       return;
     }
-
     pushMessage("user", "Talk to a Mentor");
-    const categories = await getExpertCategories();
-    if (categories.length > 0) {
-      simulateTyping("Which topic would you like to talk to a mentor about?");
-      setFlowStep("mentor-topics");
-    } else {
-      simulateTyping("No mentor categories available. Try again later.");
-      setFlowStep("mentor-options");
-    }
+    const cats = await getExpertCategories();
+    cats.length > 0
+      ? (simulateTyping("Which topic?"), setFlowStep("mentor-topics"))
+      : (simulateTyping("No categories available."),
+        setFlowStep("mentor-options"));
   }, [pushMessage, simulateTyping, getExpertCategories, selectedConversation]);
 
-  // =====================================================
-  // FIXED: Use getExpertsByCategoryId for ID-based lookup
-  // =====================================================
+  // AUTO-SELECT: When category is selected, auto-pick first mentor
   const handleMentorCategorySelect = useCallback(
-    async (category: ExpertCategory) => {
-      pushMessage("user", category.name);
-      setSelectedExpertCategory(category);
+    async (cat: ExpertCategory) => {
+      pushMessage("user", cat.name);
+      setSelectedExpertCategory(cat);
       setIsTyping(true);
-
-      // FIX: Use category_generated_id for ID-based lookup
-      // If category has an ID, use getExpertsByCategoryId
-      // Otherwise fall back to name-based search
-      let experts: ExpertUser[] = [];
-
-      if (category.category_generated_id) {
-        // Use ID-based lookup (preferred)
-        experts = await getExpertsByCategoryId(category.category_generated_id);
-      } else {
-        // Fallback to name-based lookup
-        experts = await getExpertsByCategory(category.name);
-      }
-
+      const experts = cat.category_generated_id
+        ? await getExpertsByCategoryId(cat.category_generated_id)
+        : await getExpertsByCategory(cat.name);
       setIsTyping(false);
 
       if (experts.length > 0) {
-        setMentorExperts(experts);
+        // Auto-select first expert
+        const firstExpert = experts[0];
+        setAutoSelectedExpert(firstExpert);
+
+        // Show connecting message
         pushMessage(
           "bot",
-          `Found **${experts.length} mentor${experts.length > 1 ? "s" : ""}** for **${category.name}**. Choose one:`,
+          `Connecting you with **${firstExpert.name}**, your mentor for **${cat.name}**...`,
         );
-        setFlowStep("mentor-experts");
+
+        // Auto-create conversation
+        const c = savedContact ?? mentorForm;
+        const success = await createConversation({
+          visitor_name: c.name,
+          visitor_email: c.email,
+          visitor_phone_number: c.mobile,
+          visitor_generated_id: c.registered_employee_generated_id ?? "",
+          category_generated_id: cat.category_generated_id ?? "",
+          category_name: cat.name ?? "",
+        });
+
+        if (success) {
+          pushMessage(
+            "bot",
+            `You're now talking to **${firstExpert.name}**. Say hello! 👋`,
+          );
+          setFlowStep("mentor-chat");
+        } else {
+          pushMessage("bot", "Couldn't start conversation — try again.");
+        }
       } else {
         pushMessage(
           "bot",
-          `No mentors available for **${category.name}**. Try another.`,
+          `No mentors available for **${cat.name}**. Try another.`,
         );
         setFlowStep("mentor-topics");
-      }
-    },
-    [pushMessage, getExpertsByCategory, getExpertsByCategoryId],
-  );
-
-  const handleExpertSelect = useCallback(
-    async (expert: ExpertUser) => {
-      const contact = savedContact ?? mentorForm;
-      pushMessage("user", `Chat with ${expert.name}`);
-      setIsTyping(true);
-      const payload = {
-        visitor_name: contact.name,
-        visitor_email: contact.email,
-        visitor_phone_number: contact.mobile,
-        visitor_generated_id: contact.registered_employee_generated_id ?? "",
-        category_generated_id:
-          selectedExpertCategory?.category_generated_id ?? "",
-        category_name: selectedExpertCategory?.name ?? "",
-      };
-
-      console.log("Conversation Payload:", payload);
-
-      const success = await createConversation(payload);
-      setIsTyping(false);
-      if (success) {
-        pushMessage("bot", `Connecting with **${expert.name}**. Say hello!`);
-        setFlowStep("mentor-chat");
-      } else {
-        pushMessage("bot", "Couldn't start conversation — try again.");
       }
     },
     [
@@ -2585,7 +2526,8 @@ function ChatWidgetInner() {
       mentorForm,
       pushMessage,
       createConversation,
-      selectedExpertCategory,
+      getExpertsByCategory,
+      getExpertsByCategoryId,
     ],
   );
 
@@ -2593,7 +2535,6 @@ function ChatWidgetInner() {
     e?.preventDefault();
     setQuerySubmitTrigger((n) => n + 1);
   }, []);
-
   const handleSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2601,7 +2542,6 @@ function ChatWidgetInner() {
     },
     [flowStep, handleMentorFormSubmit],
   );
-
   const handleLiveChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2610,7 +2550,6 @@ function ChatWidgetInner() {
     },
     [chatbotQuestion, askQuestion],
   );
-
   const handleMentorChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2640,17 +2579,17 @@ function ChatWidgetInner() {
                 ? "Live Chat"
                 : flowStep === "mentor-topics"
                   ? "Talk to a Mentor"
-                  : flowStep === "mentor-experts"
-                    ? (selectedExpertCategory?.name ?? "Choose Mentor")
+                  : flowStep === "post-chat-options"
+                    ? "More Questions?"
                     : flowStep === "mentor-chat"
-                      ? (selectedConversation?.category_name ?? "Mentor Chat")
+                      ? (autoSelectedExpert?.name ??
+                        selectedConversation?.category_name ??
+                        "Mentor Chat")
                       : "Next Steps";
-
   const displayContact = savedContact ?? mentorForm;
 
   const renderContent = () => {
-    // STEP 1: FAQ QUESTIONS
-    if (flowStep === "faq-list") {
+    if (flowStep === "faq-list")
       return (
         <div className="cw-faqlist-wrap">
           <div className="cw-section-title">
@@ -2700,11 +2639,8 @@ function ChatWidgetInner() {
           </button>
         </div>
       );
-    }
-
-    // STEP 2: CATEGORIES
     if (flowStep === "faq-categories" && selectedFAQ) {
-      const categories = selectedFAQ.categories || [];
+      const cats = selectedFAQ.categories || [];
       return (
         <div className="cw-faqlist-wrap">
           <div className="cw-section-title">
@@ -2713,11 +2649,11 @@ function ChatWidgetInner() {
             </span>
             Categories
           </div>
-          {categories.length === 0 ? (
+          {cats.length === 0 ? (
             <div className="cw-empty-state">No categories yet.</div>
           ) : (
             <div className="cw-faqlist-items">
-              {categories.map((cat, i) => (
+              {cats.map((cat, i) => (
                 <button
                   key={cat.category_generated_id || i}
                   className="cw-faqlist-item"
@@ -2745,8 +2681,6 @@ function ChatWidgetInner() {
         </div>
       );
     }
-
-    // STEP 3: QUESTIONS + ANSWER
     if (flowStep === "faq-questions" && selectedCategory) {
       const questions = selectedCategory.questions || [];
       return (
@@ -2808,20 +2742,17 @@ function ChatWidgetInner() {
         </div>
       );
     }
-
     if (flowStep === "mentor-form") {
-      const currentIndex = MENTOR_STEPS.findIndex(
-        (s) => s.key === mentorFormStep,
-      );
+      const ci = MENTOR_STEPS.findIndex((s) => s.key === mentorFormStep);
       return (
         <div className="cw-progress-card">
           {MENTOR_STEPS.map((s, i) => (
             <div
               key={s.key}
-              className={`cw-progress-step ${i < currentIndex ? "is-done" : ""} ${i === currentIndex ? "is-active" : ""}`}
+              className={`cw-progress-step ${i < ci ? "is-done" : ""} ${i === ci ? "is-active" : ""}`}
             >
               <span className="cw-progress-dot">
-                {i < currentIndex ? <Check size={12} /> : s.icon}
+                {i < ci ? <Check size={12} /> : s.icon}
               </span>
               <span className="cw-progress-label">{s.label}</span>
               {i < MENTOR_STEPS.length - 1 && (
@@ -2829,7 +2760,7 @@ function ChatWidgetInner() {
               )}
             </div>
           ))}
-          {isSavingContact && mentorFormStep === "email" && (
+          {isSavingContact && (
             <div className="cw-saving-indicator">
               <Loader2 size={12} className="cw-spin" />
               Saving...
@@ -2838,8 +2769,7 @@ function ChatWidgetInner() {
         </div>
       );
     }
-
-    if (flowStep === "mentor-options") {
+    if (flowStep === "mentor-options")
       return (
         <div className="cw-options-wrap">
           <div className="cw-contact-summary">
@@ -2911,9 +2841,46 @@ function ChatWidgetInner() {
           </button>
         </div>
       );
-    }
 
-    if (flowStep === "query-form") {
+    // POST-CHAT OPTIONS (after conversation ends)
+    if (flowStep === "post-chat-options")
+      return (
+        <div className="cw-options-wrap">
+          <div className="cw-section-title">What would you like to do?</div>
+          <button
+            className="cw-option-btn cw-option-chat"
+            onClick={handleChatWithBot}
+            type="button"
+          >
+            <div className="cw-option-icon">
+              <Bot size={20} />
+            </div>
+            <div className="cw-option-text">
+              <span className="cw-option-label">Chat with Bot</span>
+              <span className="cw-option-desc">
+                Get instant answers from CareBot AI
+              </span>
+            </div>
+          </button>
+          <button
+            className="cw-option-btn cw-option-query"
+            onClick={handleStartQueryForm}
+            type="button"
+          >
+            <div className="cw-option-icon">
+              <FileText size={20} />
+            </div>
+            <div className="cw-option-text">
+              <span className="cw-option-label">Raise a Query</span>
+              <span className="cw-option-desc">
+                Not satisfied? Log a ticket for our team
+              </span>
+            </div>
+          </button>
+        </div>
+      );
+
+    if (flowStep === "query-form")
       return (
         <div className="cw-query-form-wrap">
           <div className="cw-contact-summary cw-contact-summary--compact">
@@ -2991,9 +2958,7 @@ function ChatWidgetInner() {
           </form>
         </div>
       );
-    }
-
-    if (flowStep === "mentor-topics") {
+    if (flowStep === "mentor-topics")
       return (
         <div className="cw-categories-wrap">
           <div className="cw-section-title">
@@ -3034,40 +2999,6 @@ function ChatWidgetInner() {
           )}
         </div>
       );
-    }
-
-    if (flowStep === "mentor-experts") {
-      return (
-        <div className="cw-faqlist-wrap">
-          <div className="cw-section-title">
-            <span className="cw-section-icon">
-              <Users size={15} />
-            </span>
-            Choose a mentor
-          </div>
-          {mentorExperts.length === 0 && (
-            <div className="cw-empty-state">No mentors available.</div>
-          )}
-          {mentorExperts.length > 0 && (
-            <div className="cw-faqlist-items">
-              {mentorExperts.map((expert, i) => (
-                <button
-                  key={expert.user_generated_id ?? i}
-                  className="cw-faqlist-item"
-                  style={{ animationDelay: `${i * 0.05}s` }}
-                  onClick={() => handleExpertSelect(expert)}
-                  type="button"
-                >
-                  <User size={14} />
-                  <span>{expert.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
     return null;
   };
 
@@ -3097,7 +3028,7 @@ function ChatWidgetInner() {
               <div className="cw-header-title">{headerTitle}</div>
               <div className="cw-header-status">
                 <span
-                  className={`cw-status-dot ${flowStep === "mentor-chat" && selectedConversation?.status !== "ACTIVE" ? "cw-status-dot--waiting" : ""}`}
+                  className={`cw-status-dot ${flowStep === "mentor-chat" ? (selectedConversation?.status === "ACTIVE" ? "" : selectedConversation?.status === "CLOSED" ? "cw-status-dot--closed" : "cw-status-dot--waiting") : ""}`}
                 />
                 <span>
                   {flowStep === "mentor-chat"
@@ -3178,38 +3109,101 @@ function ChatWidgetInner() {
               ))}
             {flowStep === "mentor-chat" && (
               <>
-                {mentorMessages.length === 0 && !mentorLoading && (
-                  <div className="cw-empty-state cw-mentor-empty">
-                    No messages yet — send the first one.
+                {conversationEnded && (
+                  <div className="cw-system-message cw-conversation-ended">
+                    <Clock size={14} /> This conversation has ended
                   </div>
                 )}
-                {mentorMessages.map((mm, i) => {
-                  const isVisitor = mm.sender === "VISITOR";
-                  return (
-                    <div
-                      key={mm.message_generated_id ?? `m-${i}`}
-                      className={`cw-msg ${isVisitor ? "cw-msg--user" : ""}`}
-                    >
+                {mentorMessages
+                  .filter(
+                    (mm, idx, self) =>
+                      idx ===
+                      self.findIndex(
+                        (m) =>
+                          m.message_generated_id === mm.message_generated_id,
+                      ),
+                  )
+                  .map((mm, i) => {
+                    const iv = mm.sender === "VISITOR";
+                    const isLastVisitorMsg =
+                      iv &&
+                      i ===
+                        mentorMessages.filter(
+                          (mm2, idx2, self2) =>
+                            idx2 ===
+                            self2.findIndex(
+                              (m) =>
+                                m.message_generated_id ===
+                                mm2.message_generated_id,
+                            ),
+                        ).length -
+                          1;
+                    return (
                       <div
-                        className={`cw-avatar ${isVisitor ? "cw-avatar--user" : "cw-avatar--bot"}`}
+                        key={
+                          mm.message_generated_id
+                            ? `${mm.message_generated_id}-${i}`
+                            : `m-${i}`
+                        }
+                        className={`cw-msg ${iv ? "cw-msg--user" : ""}`}
                       >
-                        {isVisitor ? <User size={12} /> : <Users size={13} />}
+                        <div
+                          className={`cw-avatar ${iv ? "cw-avatar--user" : "cw-avatar--bot"}`}
+                        >
+                          {iv ? <User size={12} /> : <Users size={13} />}
+                        </div>
+                        <div
+                          className={`cw-bubble ${iv ? "cw-bubble--user" : "cw-bubble--bot"}`}
+                        >
+                          {mm.message}
+                          {iv && isLastVisitorMsg && (
+                            <div className="cw-message-status">
+                              {mm.is_read ? (
+                                <CheckCheck
+                                  size={12}
+                                  className="cw-status-read"
+                                />
+                              ) : (
+                                <Clock
+                                  size={12}
+                                  className="cw-status-pending"
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div
-                        className={`cw-bubble ${isVisitor ? "cw-bubble--user" : "cw-bubble--bot"}`}
+                    );
+                  })}
+                {conversationEnded && (
+                  <div className="cw-post-chat-actions">
+                    <p className="cw-post-chat-text">
+                      Do you have any more questions?
+                    </p>
+                    <div className="cw-post-chat-buttons">
+                      <button
+                        className="cw-btn cw-btn--yes"
+                        onClick={handleYesMoreQuestions}
+                        type="button"
                       >
-                        {mm.message}
-                      </div>
+                        Yes
+                      </button>
+                      <button
+                        className="cw-btn cw-btn--no"
+                        onClick={handleNoMoreQuestions}
+                        type="button"
+                      >
+                        No
+                      </button>
                     </div>
-                  );
-                })}
+                  </div>
+                )}
               </>
             )}
             {renderContent()}
             {(isTyping ||
               (flowStep === "live-chat" && chatbotLoading) ||
-              (flowStep === "mentor-topics" && expertsLoading) ||
-              (flowStep === "mentor-experts" && mentorLoading)) && (
+              (flowStep === "mentor-topics" && expertsLoading)) && (
               <div className="cw-msg">
                 <div className="cw-avatar cw-avatar--bot">
                   <Bot size={13} />
