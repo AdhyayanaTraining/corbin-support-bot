@@ -186,33 +186,53 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     payload: CreateConversationPayload,
   ): Promise<boolean> => {
     try {
+      console.log("================================");
+      console.log("createConversation() CALLED");
+      console.log(payload);
+
       const validationErrors = validateConversation(payload);
+
+      console.log("Validation Errors:", validationErrors);
+
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
         return false;
       }
+
       setLoading(true);
+
+      console.log("Calling ChatService.createConversation()");
+
       const response = await ChatService.createConversation(payload);
+
+      console.log("Response:", response);
+
       if (response.success) {
         setSelectedConversation(response.data);
+
         setConversations((prev) => {
           const exists = prev.some(
             (c) =>
               c.conversation_generated_id ===
               response.data.conversation_generated_id,
           );
+
           if (exists) return prev;
+
           return [response.data, ...prev];
         });
+
         return true;
       }
+
       return false;
     } catch (error: any) {
-      console.log(
-        "Create Conversation Error",
-        error.response?.status,
-        error.response?.data,
-      );
+      console.log("ERROR OCCURRED");
+      console.log(error);
+      console.log(error.response);
+      console.log(error.response?.data);
+      console.log(error.response?.status);
+
       return false;
     } finally {
       setLoading(false);
