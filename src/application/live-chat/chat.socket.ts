@@ -18,12 +18,11 @@ class ChatSocket {
       return this.socket;
     }
 
-    this.socket = io(
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
-      {
-        transports: ["websocket"],
-      },
-    );
+    const socketUrl = process.env.SERVER_URL || "http://localhost:8000";
+
+    this.socket = io(socketUrl, {
+      transports: ["websocket"],
+    });
 
     return this.socket;
   }
@@ -38,7 +37,6 @@ class ChatSocket {
     }
 
     this.socket.disconnect();
-
     this.socket = null;
   }
 
