@@ -1,5 +1,5 @@
 /* ============================================
-   CHAT WIDGET STYLES - CareBot · GoldCrest.Ai LMS
+   CHAT WIDGET STYLES - Nimo Bot · GoldCrest.Ai LMS
    ============================================ */
 
 .cw-root {
@@ -40,50 +40,33 @@
 }
 
 /* ============ LAUNCHER ============ */
+/* Mobile-responsive launcher - not too big, not too small */
 .cw-launcher {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(
-    145deg,
-    var(--cw-primary-light) 0%,
-    var(--cw-primary) 60%,
-    var(--cw-primary-dark) 100%
-  ) !important;
+  width: 130px;
+  height: 130px;
+  background: transparent !important;
   border: none;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: var(--cw-shadow-lg);
   position: relative;
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
+  filter: drop-shadow(0 8px 16px rgba(9, 25, 49, 0.35));
+  transition: transform 0.25s ease;
 }
 .cw-launcher:hover {
   transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 26px 64px rgba(9, 25, 49, 0.3);
 }
 .cw-launcher:active {
   transform: scale(0.96);
 }
-.cw-launcher svg {
-  width: 26px;
-  height: 26px;
-  color: var(--cw-gold) !important;
-  stroke: var(--cw-gold) !important;
-}
-.cw-launcher-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--cw-gold) !important;
-  border: 2px solid #ffffff;
-  animation: cw-pulse 1.8s ease-in-out infinite;
+.cw-launcher-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  filter: brightness(0.8) contrast(1.25) saturate(1.15);
 }
 @keyframes cw-pulse {
   0%,
@@ -179,21 +162,20 @@
   stroke: #fff !important;
 }
 .cw-header-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   background: var(--cw-gold-tint) !important;
-  border: 1px solid rgba(226, 165, 60, 0.35);
+  border: 1.5px solid rgba(226, 165, 60, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .cw-header-icon svg {
-  width: 18px;
-  height: 18px;
-  color: var(--cw-gold) !important;
-  stroke: var(--cw-gold) !important;
+  width: 24px;
+  height: 24px;
 }
 .cw-header-meta {
   flex: 1;
@@ -604,43 +586,59 @@
   padding: 8px 0;
 }
 
-/* ============ HELP BUTTON ============ */
+/* ============ HELP BUTTON (Clear, noticeable option) ============ */
 .cw-help-btn {
   width: 100%;
-  padding: 13px 15px;
-  background: rgba(239, 68, 68, 0.05);
-  border: 1.5px dashed rgba(239, 68, 68, 0.45);
+  padding: 14px 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(31, 181, 114, 0.08),
+    rgba(31, 181, 114, 0.04)
+  );
+  border: 2px solid rgba(31, 181, 114, 0.35);
   border-radius: 13px;
-  color: var(--cw-danger);
+  color: #128a54;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
   text-align: left;
+  box-shadow: 0 2px 8px rgba(31, 181, 114, 0.08);
 }
 .cw-help-btn-icon {
   flex-shrink: 0;
   margin-top: 1px;
+  color: #128a54 !important;
 }
 .cw-help-btn-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .cw-help-btn-text span:first-child {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
+  color: #128a54;
 }
 .cw-help-btn-sub {
-  font-size: 11px;
-  font-weight: 500;
-  opacity: 0.85;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #16a34a;
+  opacity: 0.9;
 }
 .cw-help-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-style: solid;
-  transform: translateY(-1px);
+  background: linear-gradient(
+    135deg,
+    rgba(31, 181, 114, 0.15),
+    rgba(31, 181, 114, 0.08)
+  );
+  border-color: rgba(31, 181, 114, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(31, 181, 114, 0.15);
+}
+.cw-help-btn:active {
+  transform: scale(0.98);
 }
 
 /* ============ CATEGORIES ============ */
@@ -1196,6 +1194,17 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
+/* NIMO BOT PROFILE */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+.cw-nimo-profile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 /* SYSTEM MESSAGE */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 .cw-system-message {
@@ -1349,15 +1358,39 @@
   color: #dce8ff;
 }
 
-/* ============ RESPONSIVE ============ */
+/* ============ RESPONSIVE - Mobile optimized ============ */
 @media (max-width: 480px) {
   .cw-root {
-    bottom: 12px;
-    right: 12px;
+    bottom: 16px;
+    right: 16px;
+  }
+  .cw-launcher {
+    width: 56px;
+    height: 56px;
   }
   .cw-panel {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 100px);
+    width: calc(100vw - 32px);
+    height: calc(100vh - 140px);
+    max-width: 100%;
+    border-radius: 20px;
+  }
+  .cw-header {
+    padding: 14px 16px;
+  }
+  .cw-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+  .cw-header-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  .cw-header-title {
+    font-size: 13.5px;
+  }
+  .cw-header-status span {
+    font-size: 10px;
   }
   .cw-categories-wrap,
   .cw-faqlist-wrap,
@@ -1385,5 +1418,41 @@
   .cw-header-back-btn svg {
     width: 16px;
     height: 16px;
+  }
+  .cw-messages {
+    padding: 16px;
+  }
+  .cw-bubble {
+    max-width: 230px;
+    font-size: 13px;
+  }
+  .cw-input {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+  .cw-faqlist-item {
+    padding: 11px 13px;
+    font-size: 12px;
+  }
+  .cw-help-btn {
+    padding: 13px 15px;
+  }
+  .cw-help-btn-text span:first-child {
+    font-size: 12.5px;
+  }
+  .cw-help-btn-sub {
+    font-size: 11px;
+  }
+}
+
+/* ============ RESPONSIVE - Tablet ============ */
+@media (min-width: 481px) and (max-width: 768px) {
+  .cw-launcher {
+    width: 64px;
+    height: 64px;
+  }
+  .cw-panel {
+    width: 380px;
+    height: 600px;
   }
 }
