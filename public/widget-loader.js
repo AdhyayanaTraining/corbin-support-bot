@@ -3,8 +3,8 @@
   // PREVENT MULTIPLE LOADS
   // =====================================================
 
-  if (window.__careDataBotLoaded) return;
-  window.__careDataBotLoaded = true;
+  if (window.__supportBotLoaded) return;
+  window.__supportBotLoaded = true;
 
   var script = document.currentScript;
 
@@ -14,7 +14,7 @@
 
   var widgetOrigin =
     (script && script.getAttribute("data-origin")) ||
-    "https://caredatabot.corbinprojects.co.in";
+    "https://supportbot.corbinprojects.co.in";
 
   // =====================================================
   // CONFIGURATION
@@ -43,9 +43,9 @@
 
   iframe.src = widgetOrigin + "/embed";
 
-  iframe.title = "CareData Bot";
+  iframe.title = "SupportBot";
 
-  iframe.id = "caredata-bot-iframe";
+  iframe.id = "supportbot-iframe";
 
   iframe.allow = "clipboard-write";
 
@@ -89,7 +89,7 @@
 
     if (!event.data) return;
 
-    if (event.data.source !== "caredata-bot-widget") return;
+    if (event.data.source !== "supportbot-widget") return;
 
     if (event.data.type === "OPEN") {
       if (isMobile()) {
@@ -139,5 +139,5 @@
 
   document.body.appendChild(iframe);
 
-  console.log("CareData Bot Widget Loaded");
+  console.log("SupportBot Widget Loaded");
 })();
