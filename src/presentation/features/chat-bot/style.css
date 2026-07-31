@@ -161,6 +161,33 @@
   color: #fff !important;
   stroke: #fff !important;
 }
+
+/* ---- header home button ---- */
+.cw-header-home-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+.cw-header-home-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+.cw-header-home-btn svg {
+  width: 16px;
+  height: 16px;
+  color: #fff !important;
+  stroke: #fff !important;
+}
+
 .cw-header-icon {
   width: 42px;
   height: 42px;
@@ -478,6 +505,70 @@
   flex-shrink: 0;
 }
 
+/* ============ RESUME BANNER ============ */
+.cw-resume-banner {
+  width: 100%;
+  padding: 12px 14px;
+  background: linear-gradient(
+    135deg,
+    rgba(31, 181, 114, 0.06),
+    rgba(31, 181, 114, 0.03)
+  );
+  border: 1.5px solid rgba(31, 181, 114, 0.3);
+  border-radius: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+  animation: cw-card-in 0.3s ease both;
+}
+.cw-resume-banner:hover {
+  border-color: rgba(31, 181, 114, 0.5);
+  background: rgba(31, 181, 114, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(31, 181, 114, 0.1);
+}
+.cw-resume-banner:active {
+  transform: scale(0.98);
+}
+.cw-resume-banner--inline {
+  margin-bottom: 14px;
+}
+.cw-resume-banner-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(31, 181, 114, 0.12);
+  color: var(--cw-online);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cw-resume-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cw-resume-banner-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #128a54;
+}
+.cw-resume-banner-sub {
+  font-size: 11px;
+  color: #16a34a;
+  opacity: 0.85;
+}
+.cw-resume-banner-arrow {
+  flex-shrink: 0;
+  color: #128a54;
+}
+
 /* ============ FAQ LIST ============ */
 .cw-faqlist-wrap {
   padding: 6px 0 4px 39px;
@@ -711,6 +802,68 @@
   color: var(--cw-text);
 }
 
+/* ============ SKIP CATEGORY BUTTON ============ */
+.cw-skip-category-btn {
+  width: 100%;
+  padding: 11px 14px;
+  margin-top: 8px;
+  background: transparent;
+  border: 1.5px dashed var(--cw-border);
+  border-radius: 10px;
+  color: var(--cw-text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cw-skip-category-btn:hover {
+  border-color: var(--cw-text-muted);
+  color: var(--cw-text);
+  background: var(--cw-bg-soft);
+}
+.cw-skip-category-btn:active {
+  transform: scale(0.98);
+}
+
+/* ============ QUERY CATEGORY BADGE ============ */
+.cw-query-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  background: var(--cw-primary-tint);
+  border: 1px solid rgba(14, 39, 73, 0.15);
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--cw-primary);
+  margin-bottom: 8px;
+  animation: cw-msg-in 0.3s ease both;
+}
+.cw-query-category-badge svg {
+  color: var(--cw-primary);
+  flex-shrink: 0;
+}
+.cw-query-category-badge span {
+  color: var(--cw-primary);
+}
+.cw-query-category-change {
+  margin-left: 4px;
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--cw-primary-light);
+  cursor: pointer;
+  text-decoration: underline;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+.cw-query-category-change:hover {
+  background: rgba(14, 39, 73, 0.08);
+}
+
 /* ============ MENTOR FORM PROGRESS ============ */
 .cw-progress-card {
   margin: 4px 0 4px 39px;
@@ -896,6 +1049,17 @@
   border-color: var(--cw-purple);
   background: rgba(124, 92, 240, 0.05) !important;
 }
+
+/* ---- End Chat option ---- */
+.cw-option-end .cw-option-icon {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--cw-text-muted);
+}
+.cw-option-end:hover {
+  border-color: #94a3b8;
+  background: rgba(100, 116, 139, 0.04) !important;
+}
+
 .cw-option-text {
   display: flex;
   flex-direction: column;

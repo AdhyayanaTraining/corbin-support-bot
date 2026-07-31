@@ -1,7 +1,10 @@
-import { CreateRequestQueryPayload } from "./requestQuery.types";
+import {
+  CreateRequestQueryPayload,
+  RespondToQueryPayload,
+} from "./requestQuery.types";
 
 // ======================================================
-// VALIDATION ERRORS
+// REQUEST QUERY VALIDATION ERRORS
 // ======================================================
 
 export interface RequestQueryValidationErrors {
@@ -14,6 +17,20 @@ export interface RequestQueryValidationErrors {
   query_title?: string;
 
   query_description?: string;
+
+  category?: string; // Category validation error added
+}
+
+// ======================================================
+// RESPOND TO QUERY VALIDATION ERRORS
+// ======================================================
+
+export interface RespondToQueryValidationErrors {
+  subject?: string;
+
+  message?: string;
+
+  responded_by?: string;
 }
 
 // ======================================================
@@ -67,6 +84,50 @@ export function validateRequestQuery(
 
   if (!requestQuery.query_description.trim()) {
     errors.query_description = "Query description is required.";
+  }
+
+  // ======================================================
+  // Category (Optional - but validate if provided)
+  // ======================================================
+
+  if (requestQuery.category && !requestQuery.category.trim()) {
+    errors.category = "Category cannot be empty if provided.";
+  }
+
+  return errors;
+}
+
+// ======================================================
+// VALIDATE RESPOND TO QUERY
+// ======================================================
+
+export function validateRespondToQuery(
+  respondQuery: RespondToQueryPayload,
+): RespondToQueryValidationErrors {
+  const errors: RespondToQueryValidationErrors = {};
+
+  // ======================================================
+  // Subject
+  // ======================================================
+
+  if (!respondQuery.subject.trim()) {
+    errors.subject = "Email subject is required.";
+  }
+
+  // ======================================================
+  // Message
+  // ======================================================
+
+  if (!respondQuery.message.trim()) {
+    errors.message = "Email message is required.";
+  }
+
+  // ======================================================
+  // Responded By
+  // ======================================================
+
+  if (!respondQuery.responded_by.trim()) {
+    errors.responded_by = "Responded by is required.";
   }
 
   return errors;

@@ -2,6 +2,7 @@ import axiosClient from "@/src/infrastructure/api/axiosClient";
 
 import {
   CreateRequestQueryPayload,
+  RespondToQueryPayload,
   UpdateRequestQueryPayload,
 } from "./requestQuery.types";
 
@@ -39,6 +40,18 @@ class RequestQueryService {
   }
 
   // =====================================================
+  // GET REQUEST QUERIES BY CATEGORY (NEW)
+  // =====================================================
+
+  async getRequestQueriesByCategory(category: string) {
+    const response = await axiosClient.get(`/get-request-queries-by-category`, {
+      params: { category },
+    });
+
+    return response.data;
+  }
+
+  // =====================================================
   // UPDATE REQUEST QUERY
   // =====================================================
 
@@ -61,6 +74,22 @@ class RequestQueryService {
   async deleteRequestQuery(request_query_generated_id: string) {
     const response = await axiosClient.delete(
       `/delete-request-query/${request_query_generated_id}`,
+    );
+
+    return response.data;
+  }
+
+  // =====================================================
+  // RESPOND TO QUERY
+  // =====================================================
+
+  async respondToQuery(
+    request_query_generated_id: string,
+    payload: RespondToQueryPayload,
+  ) {
+    const response = await axiosClient.post(
+      `/respond-to-query/${request_query_generated_id}`,
+      payload,
     );
 
     return response.data;
