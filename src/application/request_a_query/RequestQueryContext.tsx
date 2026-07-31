@@ -27,7 +27,9 @@ import {
   RequestQuery,
   CreateRequestQueryPayload,
   UpdateRequestQueryPayload,
+  RespondToQueryPayload,
   EMPTY_REQUEST_QUERY,
+  EMPTY_RESPOND_TO_QUERY,
 } from "./requestQuery.types";
 
 // ======================================================
@@ -36,7 +38,9 @@ import {
 
 import {
   validateRequestQuery,
+  validateRespondToQuery,
   RequestQueryValidationErrors,
+  RespondToQueryValidationErrors,
 } from "./requestQuery.validation";
 
 // ======================================================
@@ -57,7 +61,7 @@ interface RequestQueryContextType {
   setSelectedRequestQueryData: (requestQuery: RequestQuery) => void;
 
   handleChange: (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => void;
 
   resetForm: () => void;
@@ -70,9 +74,19 @@ interface RequestQueryContextType {
     request_query_generated_id: string,
   ) => Promise<void>;
 
+  getRequestQueriesByCategory: (category: string) => Promise<void>; // New method added
+
   updateRequestQuery: () => Promise<boolean>;
 
   deleteRequestQuery: (request_query_generated_id: string) => Promise<boolean>;
+
+  respondQuery: RespondToQueryPayload;
+
+  respondErrors: RespondToQueryValidationErrors;
+
+  setRespondQuery: React.Dispatch<React.SetStateAction<RespondToQueryPayload>>;
+
+  respondToQuery: () => Promise<boolean>;
 }
 
 // ======================================================
@@ -120,12 +134,19 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
   const [selectedRequestQuery, setSelectedRequestQuery] =
     useState<RequestQuery | null>(null);
 
+  const [respondQuery, setRespondQuery] = useState<RespondToQueryPayload>(
+    EMPTY_RESPOND_TO_QUERY,
+  );
+
+  const [respondErrors, setRespondErrors] =
+    useState<RespondToQueryValidationErrors>({});
+
   // ======================================================
   // HANDLE CHANGE
   // ======================================================
 
   const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
 
@@ -174,6 +195,8 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
       screenshot_url: selected.screenshot_url ?? "",
 
+      category: selected.category ?? "", // Category field added
+
       assigned_to: selected.assigned_to ?? "",
 
       resolution_note: selected.resolution_note ?? "",
@@ -181,6 +204,7 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
     setErrors({});
   };
+
   // ======================================================
   // ADD REQUEST QUERY
   // ======================================================
@@ -261,6 +285,8 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
           screenshot_url: response.data.screenshot_url ?? "",
 
+          category: response.data.category ?? "", // Category field added
+
           assigned_to: response.data.assigned_to ?? "",
 
           resolution_note: response.data.resolution_note ?? "",
@@ -268,6 +294,27 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Error fetching request query:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // GET REQUEST QUERIES BY CATEGORY (NEW)
+  // ======================================================
+
+  const getRequestQueriesByCategory = async (
+    category: string,
+  ): Promise<void> => {
+    try {
+      setLoading(true);
+
+      const response =
+        await RequestQueryService.getRequestQueriesByCategory(category);
+
+      setRequestQueries(response.data || []);
+    } catch (error) {
+      console.error("Error fetching request queries by category:", error);
     } finally {
       setLoading(false);
     }
@@ -350,7 +397,50 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }; // ======================================================
+  };
+
+  // ======================================================
+  // RESPOND TO QUERY
+  // ======================================================
+
+  const respondToQuery = async (): Promise<boolean> => {
+    if (!selectedRequestQuery) {
+      return false;
+    }
+
+    const validationErrors = validateRespondToQuery(respondQuery);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setRespondErrors(validationErrors);
+
+      return false;
+    }
+
+    try {
+      setLoading(true);
+
+      await RequestQueryService.respondToQuery(
+        selectedRequestQuery.request_query_generated_id!,
+        respondQuery,
+      );
+
+      await getRequestQueries();
+
+      setRespondQuery(EMPTY_RESPOND_TO_QUERY);
+
+      setRespondErrors({});
+
+      return true;
+    } catch (error) {
+      console.error("Error responding to query:", error);
+
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
   // INITIAL LOAD
   // ======================================================
 
@@ -385,9 +475,19 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
     getRequestQueryByGeneratedId,
 
+    getRequestQueriesByCategory, // New method added
+
     updateRequestQuery,
 
     deleteRequestQuery,
+
+    respondQuery,
+
+    respondErrors,
+
+    setRespondQuery,
+
+    respondToQuery,
   };
 
   // ======================================================

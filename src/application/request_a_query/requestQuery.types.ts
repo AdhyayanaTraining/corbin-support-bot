@@ -28,6 +28,8 @@ export interface RequestQuery {
 
   screenshot_url?: string;
 
+  category?: string; // Category field added
+
   request_status?: RequestQueryStatus;
 
   assigned_to?: string;
@@ -41,6 +43,10 @@ export interface RequestQuery {
   created_at?: Date;
 
   updated_at?: Date;
+
+  responded_by?: string;
+
+  last_response_at?: Date;
 }
 
 // ======================================================
@@ -59,6 +65,8 @@ export interface CreateRequestQueryPayload {
   query_description: string;
 
   screenshot_url?: string;
+
+  category?: string; // Category field added
 
   assigned_to?: string;
 
@@ -82,12 +90,38 @@ export interface UpdateRequestQueryPayload {
 
   screenshot_url?: string;
 
+  category?: string; // Category field added
+
   request_status?: RequestQueryStatus;
 
   assigned_to?: string;
 
   resolution_note?: string;
 }
+
+// ======================================================
+// RESPOND TO QUERY PAYLOAD
+// ======================================================
+
+export interface RespondToQueryPayload {
+  subject: string;
+
+  message: string;
+
+  responded_by: string;
+}
+
+// ======================================================
+// EMPTY RESPOND TO QUERY
+// ======================================================
+
+export const EMPTY_RESPOND_TO_QUERY: RespondToQueryPayload = {
+  subject: "",
+
+  message: "",
+
+  responded_by: "",
+};
 
 // ======================================================
 // EMPTY REQUEST QUERY
@@ -105,6 +139,8 @@ export const EMPTY_REQUEST_QUERY: CreateRequestQueryPayload = {
   query_description: "",
 
   screenshot_url: "",
+
+  category: "", // Category field added
 
   assigned_to: "",
 

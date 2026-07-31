@@ -2030,20 +2030,17 @@ import {
   ArrowLeft,
   FileText,
   Send,
-  Sparkles,
   Phone,
   Mail,
   Bot,
   Check,
   Folder,
-  HelpCircle,
   MessageSquareWarning,
   Loader2,
   Pencil,
   ClipboardList,
   Users,
   MessageSquare,
-  Clock,
   CheckCheck,
   PartyPopper,
   DoorOpen,
@@ -2088,17 +2085,30 @@ interface Message {
   text: string;
 }
 
+// NOTE ON FLOW CHANGES
+// ---------------------------------------------------------------------------
+// - "mentor-options" is the single hub. Every "what next" decision routes
+//   through it instead of silently jumping the user into an old conversation.
+// - "mentor-resume-choice" is shown ONLY when the user explicitly taps
+//   "Talk to a Mentor" while an active conversation already exists — they
+//   choose to resume or start fresh. Nothing auto-navigates them there.
+// - "query-category" is a new step: raising a query now asks which topic it
+//   belongs to (same category list used for mentors), then goes to the
+//   title/description form. The chosen category is written into
+//   requestQuery.category (the new API field).
+// - "post-chat-options" is removed; the hub covers that job now.
 type FlowStep =
   | "faq-list"
   | "faq-categories"
   | "faq-questions"
   | "mentor-form"
   | "mentor-options"
-  | "post-chat-options"
-  | "query-form"
-  | "live-chat"
+  | "mentor-resume-choice"
   | "mentor-topics"
-  | "mentor-chat";
+  | "mentor-chat"
+  | "query-category"
+  | "query-form"
+  | "live-chat";
 
 type MentorFormStep = "name" | "mobile" | "email";
 
@@ -2115,6 +2125,7 @@ interface ValidationErrors {
   name?: string;
   mobile?: string;
   email?: string;
+  category?: string;
   query_title?: string;
   query_description?: string;
   message?: string;
@@ -2172,6 +2183,9 @@ const welcomeMessage = (): Message => ({
 });
 
 const CONTACT_STORAGE_KEY = "nimobot_contact_details";
+// Persists the FAQ topic/category the visitor last explored. Used purely as
+// a soft memory of intent — it never forces a navigation on its own.
+const FAQ_TOPIC_STORAGE_KEY = "nimobot_selected_faq_topic";
 
 // Renders changed-bot.mp4 with its black background keyed out to real
 // transparency (alpha=0), so only the bot itself is visible — no circle,
@@ -2362,6 +2376,8 @@ function ChatWidgetInner() {
     useState<ExpertUser | null>(null);
   const [selectedExpertCategory, setSelectedExpertCategory] =
     useState<ExpertCategory | null>(null);
+  const [selectedQueryCategory, setSelectedQueryCategory] =
+    useState<ExpertCategory | null>(null);
   const [connectingCategoryId, setConnectingCategoryId] = useState<
     string | null
   >(null);
@@ -2372,6 +2388,9 @@ function ChatWidgetInner() {
   const conversationEndedNotifiedRef = useRef(false);
   const [satisfactionStage, setSatisfactionStage] =
     useState<SatisfactionStage>(null);
+  // True whenever there's a mentor conversation that isn't CLOSED. This is
+  // only ever used to *offer* a resume path — it never forces navigation.
+  const [hasActiveConversation, setHasActiveConversation] = useState(false);
 
   // Local validation errors for mentor form and query form
   const [localValidationErrors, setLocalValidationErrors] =
@@ -2398,18 +2417,27 @@ function ChatWidgetInner() {
     } catch (err) {}
   }, []);
 
+  // Track whether an active conversation exists, WITHOUT auto-navigating.
+  // Previously this effect jumped the user straight into mentor-chat as soon
+  // as conversations loaded — that's the "buggy" forced behavior. Now it
+  // just keeps state up to date so the hub can *offer* a resume option.
   useEffect(() => {
-    if (!conversations || conversations.length === 0) return;
-    if (flowStep === "mentor-chat") return;
+    if (!conversations || conversations.length === 0) {
+      setHasActiveConversation(false);
+      return;
+    }
     const latestConversation = [...conversations].sort(
       (a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     )[0];
     if (latestConversation) {
       setSelectedConversation(latestConversation);
-      getConversationMessages(latestConversation.conversation_generated_id);
-      if (latestConversation.status === "CLOSED") setConversationEnded(true);
-      setFlowStep("mentor-chat");
+      if (latestConversation.status === "CLOSED") {
+        setHasActiveConversation(false);
+        setConversationEnded(true);
+      } else {
+        setHasActiveConversation(true);
+      }
     }
   }, [conversations]);
 
@@ -2424,6 +2452,7 @@ function ChatWidgetInner() {
     ) {
       conversationEndedNotifiedRef.current = true;
       setConversationEnded(true);
+      setHasActiveConversation(false);
       setSatisfactionStage("ask");
       pushMessage("bot", "This conversation has been ended by the mentor.");
       simulateTyping(
@@ -2559,7 +2588,8 @@ function ChatWidgetInner() {
             "bot",
             `Your query has been registered!\n\nTicket: **TKT-${Date.now().toString(36).toUpperCase()}**`,
           );
-          setFlowStep("faq-list");
+          setSelectedQueryCategory(null);
+          setFlowStep("mentor-options");
         } else
           pushMessage(
             "bot",
@@ -2712,6 +2742,11 @@ function ChatWidgetInner() {
     const errors: ValidationErrors = {};
     let isValid = true;
 
+    if (!requestQuery.category) {
+      errors.category = "Please select a category for your query.";
+      isValid = false;
+    }
+
     if (
       !requestQuery.query_title ||
       !isValidQueryTitle(requestQuery.query_title)
@@ -2731,7 +2766,11 @@ function ChatWidgetInner() {
 
     setLocalValidationErrors(errors);
     return isValid;
-  }, [requestQuery.query_title, requestQuery.query_description]);
+  }, [
+    requestQuery.category,
+    requestQuery.query_title,
+    requestQuery.query_description,
+  ]);
 
   const handleStart = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -2760,6 +2799,7 @@ function ChatWidgetInner() {
     conversationEndedNotifiedRef.current = false;
     setAutoSelectedExpert(null);
     setConnectingCategoryId(null);
+    setSelectedQueryCategory(null);
     hasSavedContact.current = false;
     setIsSavingContact(false);
     pendingContactRef.current = null;
@@ -2782,6 +2822,35 @@ function ChatWidgetInner() {
     resetMentorMessage,
   ]);
 
+  // Lets the visitor jump straight to the hub (or start over, if no contact
+  // saved yet) from almost anywhere — the "switch mode" affordance.
+  const handleGoHome = useCallback(() => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    setIsTyping(false);
+    if (
+      flowStep === "mentor-chat" &&
+      selectedConversation?.conversation_generated_id
+    )
+      leaveRoom(selectedConversation.conversation_generated_id);
+    setFormError(null);
+    setLocalValidationErrors({});
+    if (savedContact) {
+      pushMessage("user", "Switch");
+      simulateTyping("Sure — how would you like to proceed?");
+      setFlowStep("mentor-options");
+    } else {
+      handleStart();
+    }
+  }, [
+    flowStep,
+    selectedConversation,
+    leaveRoom,
+    savedContact,
+    pushMessage,
+    simulateTyping,
+    handleStart,
+  ]);
+
   const handleBack = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setIsTyping(false);
@@ -2799,12 +2868,23 @@ function ChatWidgetInner() {
       setSelectedQuestion(null);
       pushMessage("user", "Back");
       simulateTyping("Here are the categories again:");
-    } else if (flowStep === "query-form") {
+    } else if (flowStep === "query-category") {
       resetRequestQueryForm();
-      setFlowStep("post-chat-options");
+      setSelectedQueryCategory(null);
+      setFlowStep("mentor-options");
       pushMessage("user", "Back");
       simulateTyping("How would you like to proceed?");
-    } else if (flowStep === "post-chat-options") {
+    } else if (flowStep === "query-form") {
+      setFlowStep(
+        expertCategories.length > 0 ? "query-category" : "mentor-options",
+      );
+      pushMessage("user", "Back");
+      simulateTyping(
+        expertCategories.length > 0
+          ? "Which category is this about?"
+          : "How would you like to proceed?",
+      );
+    } else if (flowStep === "mentor-resume-choice") {
       setFlowStep("mentor-options");
       pushMessage("user", "Back");
       simulateTyping("How would you like to proceed?");
@@ -2821,9 +2901,10 @@ function ChatWidgetInner() {
       setSatisfactionStage(null);
       conversationEndedNotifiedRef.current = false;
       setAutoSelectedExpert(null);
-      setFlowStep("mentor-topics");
+      setHasActiveConversation(false);
+      setFlowStep("mentor-options");
       pushMessage("user", "Back");
-      simulateTyping("Choose another topic.");
+      simulateTyping("How would you like to proceed?");
     } else if (
       flowStep === "mentor-form" ||
       flowStep === "mentor-options" ||
@@ -2841,6 +2922,7 @@ function ChatWidgetInner() {
     simulateTyping,
     handleStart,
     resetRequestQueryForm,
+    expertCategories.length,
   ]);
 
   const handleFaqSelect = useCallback(
@@ -2863,6 +2945,17 @@ function ChatWidgetInner() {
       setSelectedQuestion(null);
       setFlowStep("faq-questions");
       pushMessage("user", cat.topic_name || "Category");
+      // Remember the topic the visitor is browsing — soft memory only,
+      // never forces navigation on its own.
+      try {
+        window.localStorage.setItem(
+          FAQ_TOPIC_STORAGE_KEY,
+          JSON.stringify({
+            id: cat.category_generated_id ?? null,
+            name: cat.topic_name ?? "",
+          }),
+        );
+      } catch (err) {}
       (cat.questions || []).length > 0
         ? simulateTyping("Here are the questions:")
         : simulateTyping("No questions yet.");
@@ -2887,29 +2980,23 @@ function ChatWidgetInner() {
     [pushMessage, simulateTyping],
   );
 
+  // "Can't find your answer?" — always routes to the hub once contact info
+  // is known. It no longer silently resumes an old mentor conversation;
+  // the hub is where that choice gets offered (see mentor-options render).
   const handleShowSatisfaction = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     pushMessage("user", "I need more help");
     if (savedContact) {
-      if (selectedConversation && selectedConversation.status !== "CLOSED") {
-        setIsTyping(true);
-        typingTimeoutRef.current = setTimeout(() => {
-          setIsTyping(false);
-          pushMessage(
-            "bot",
-            `Welcome back, **${savedContact.name}**! Resuming...`,
-          );
-          setFlowStep("mentor-chat");
-        }, 550);
-      } else {
-        setIsTyping(true);
-        typingTimeoutRef.current = setTimeout(() => {
-          setIsTyping(false);
-          pushMessage("bot", `Welcome back, **${savedContact.name}**!`);
-          setMentorForm(savedContact);
-          setFlowStep("mentor-options");
-        }, 550);
-      }
+      setIsTyping(true);
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+        pushMessage(
+          "bot",
+          `Welcome back, **${savedContact.name}**! How would you like to proceed?`,
+        );
+        setMentorForm(savedContact);
+        setFlowStep("mentor-options");
+      }, 550);
       return;
     }
     setIsTyping(true);
@@ -2928,7 +3015,7 @@ function ChatWidgetInner() {
       setDraft("");
       setFlowStep("mentor-form");
     }, 550);
-  }, [pushMessage, savedContact, selectedConversation]);
+  }, [pushMessage, savedContact]);
 
   const handleEditContact = useCallback(() => {
     setSavedContact(null);
@@ -3040,6 +3127,70 @@ function ChatWidgetInner() {
     setFlowStep("live-chat");
   }, [savedContact, mentorForm, pushMessage, simulateTyping]);
 
+  // "Talk to a Mentor" from the hub. If an active conversation already
+  // exists, we ask explicitly instead of assuming — this is the fix for
+  // the "feels buggy" auto-resume complaint.
+  const handleShowMentorTopics = useCallback(async () => {
+    pushMessage("user", "Talk to a Mentor");
+    if (
+      hasActiveConversation &&
+      selectedConversation &&
+      selectedConversation.status !== "CLOSED"
+    ) {
+      simulateTyping(
+        "You already have an ongoing conversation. Would you like to resume it or start a new topic?",
+      );
+      setFlowStep("mentor-resume-choice");
+      return;
+    }
+    try {
+      const cats = await getExpertCategories();
+      if (cats.length > 0) {
+        simulateTyping("Which topic would you like help with?");
+        setFlowStep("mentor-topics");
+      } else {
+        simulateTyping("No mentor categories available right now.");
+        setFlowStep("mentor-options");
+      }
+    } catch (err) {
+      simulateTyping("Couldn't load mentor topics — please try again.");
+      setFlowStep("mentor-options");
+    }
+  }, [
+    pushMessage,
+    simulateTyping,
+    getExpertCategories,
+    hasActiveConversation,
+    selectedConversation,
+  ]);
+
+  const handleResumeConversation = useCallback(() => {
+    pushMessage("user", "Resume conversation");
+    simulateTyping("Resuming your conversation...");
+    setFlowStep("mentor-chat");
+  }, [pushMessage, simulateTyping]);
+
+  const handleStartNewMentorTopic = useCallback(async () => {
+    pushMessage("user", "Start a new topic");
+    try {
+      const cats = await getExpertCategories();
+      if (cats.length > 0) {
+        simulateTyping("Which topic would you like help with?");
+        setFlowStep("mentor-topics");
+      } else {
+        simulateTyping("No mentor categories available right now.");
+        setFlowStep("mentor-options");
+      }
+    } catch (err) {
+      simulateTyping("Couldn't load mentor topics — please try again.");
+      setFlowStep("mentor-options");
+    }
+  }, [pushMessage, simulateTyping, getExpertCategories]);
+
+  // "Raise a Query" now asks for a category first (same category list used
+  // for mentors), then goes to the title/description form — mirroring the
+  // way mentors are matched by topic, and populating the new
+  // requestQuery.category field.
   const handleStartQueryForm = useCallback(() => {
     const c = savedContact ?? mentorForm;
     handleRequestQueryChange({
@@ -3057,17 +3208,66 @@ function ChatWidgetInner() {
     handleRequestQueryChange({
       target: { name: "query_description", value: "" },
     } as ChangeEvent<HTMLTextAreaElement>);
+    handleRequestQueryChange({
+      target: { name: "category", value: "" },
+    } as ChangeEvent<HTMLInputElement>);
+    setSelectedQueryCategory(null);
     setLocalValidationErrors({});
     pushMessage("user", "Raise a Query");
-    simulateTyping("Give me a title and details.");
-    setFlowStep("query-form");
+    (async () => {
+      try {
+        const cats = await getExpertCategories();
+        if (cats.length > 0) {
+          simulateTyping("Which category best describes your query?");
+          setFlowStep("query-category");
+        } else {
+          simulateTyping("Give me a title and details.");
+          setFlowStep("query-form");
+        }
+      } catch (err) {
+        simulateTyping("Give me a title and details.");
+        setFlowStep("query-form");
+      }
+    })();
   }, [
     savedContact,
     mentorForm,
     pushMessage,
     simulateTyping,
     handleRequestQueryChange,
+    getExpertCategories,
   ]);
+
+  const handleQueryCategorySelect = useCallback(
+    (cat: ExpertCategory) => {
+      setSelectedQueryCategory(cat);
+      handleRequestQueryChange({
+        target: { name: "category", value: cat.name },
+      } as ChangeEvent<HTMLInputElement>);
+      setLocalValidationErrors((prev) => {
+        const { category, ...rest } = prev;
+        return rest;
+      });
+      pushMessage("user", cat.name);
+      simulateTyping("Got it. Now give me a title and details.");
+      setFlowStep("query-form");
+    },
+    [handleRequestQueryChange, pushMessage, simulateTyping],
+  );
+
+  const handleSkipQueryCategory = useCallback(() => {
+    setSelectedQueryCategory(null);
+    handleRequestQueryChange({
+      target: { name: "category", value: "General" },
+    } as ChangeEvent<HTMLInputElement>);
+    setLocalValidationErrors((prev) => {
+      const { category, ...rest } = prev;
+      return rest;
+    });
+    pushMessage("user", "Not sure — skip category");
+    simulateTyping("No problem. Give me a title and details.");
+    setFlowStep("query-form");
+  }, [handleRequestQueryChange, pushMessage, simulateTyping]);
 
   const handleRaiseQueryFromEnd = useCallback(() => {
     handleStartQueryForm();
@@ -3089,28 +3289,24 @@ function ChatWidgetInner() {
     handleStart();
   }, [handleStart]);
 
-  const handleShowMentorTopics = useCallback(async () => {
-    if (selectedConversation && selectedConversation.status !== "CLOSED") {
-      pushMessage("user", "Talk to a Mentor");
-      simulateTyping("Resuming your conversation...");
-      setFlowStep("mentor-chat");
-      return;
-    }
-    pushMessage("user", "Talk to a Mentor");
-    try {
-      const cats = await getExpertCategories();
-      if (cats.length > 0) {
-        simulateTyping("Which topic?");
-        setFlowStep("mentor-topics");
-      } else {
-        simulateTyping("No categories available.");
-        setFlowStep("mentor-options");
-      }
-    } catch (err) {
-      simulateTyping("Couldn't load mentor topics — please try again.");
-      setFlowStep("mentor-options");
-    }
-  }, [pushMessage, simulateTyping, getExpertCategories, selectedConversation]);
+  // Explicit "End Chat" from the hub — lets the visitor close things out on
+  // their own terms rather than just abandoning the widget mid-flow.
+  const handleEndChat = useCallback(() => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    pushMessage("user", "End Chat");
+    setIsTyping(true);
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      pushMessage(
+        "bot",
+        "Thanks for chatting with Nimo Bot today! Have a great day. 👋",
+      );
+      typingTimeoutRef.current = setTimeout(() => {
+        handleStart();
+        setIsOpen(false);
+      }, 1100);
+    }, 550);
+  }, [pushMessage, handleStart]);
 
   const handleMentorCategorySelect = useCallback(
     async (cat: ExpertCategory) => {
@@ -3146,6 +3342,7 @@ function ChatWidgetInner() {
               "bot",
               `You're now talking to **${firstExpert.name}**. Say hello! 👋`,
             );
+            setHasActiveConversation(true);
             setFlowStep("mentor-chat");
           } else {
             pushMessage(
@@ -3235,25 +3432,76 @@ function ChatWidgetInner() {
           ? (selectedCategory?.topic_name ?? "Questions")
           : flowStep === "mentor-form"
             ? "Contact Support"
-            : flowStep === "query-form"
+            : flowStep === "query-category"
               ? "Raise a Query"
-              : flowStep === "live-chat"
-                ? "Chat with Nimo Bot"
-                : flowStep === "mentor-topics"
-                  ? "Talk to a Mentor"
-                  : flowStep === "post-chat-options"
-                    ? "More Questions?"
-                    : flowStep === "mentor-chat"
-                      ? (autoSelectedExpert?.name ??
-                        selectedConversation?.category_name ??
-                        "Mentor Chat")
-                      : "Next Steps";
+              : flowStep === "query-form"
+                ? "Raise a Query"
+                : flowStep === "live-chat"
+                  ? "Chat with Nimo Bot"
+                  : flowStep === "mentor-topics"
+                    ? "Talk to a Mentor"
+                    : flowStep === "mentor-resume-choice"
+                      ? "Talk to a Mentor"
+                      : flowStep === "mentor-options"
+                        ? "How can we help?"
+                        : flowStep === "mentor-chat"
+                          ? (autoSelectedExpert?.name ??
+                            selectedConversation?.category_name ??
+                            "Mentor Chat")
+                          : "Next Steps";
   const displayContact = savedContact ?? mentorForm;
+
+  const showHomeButton =
+    !!savedContact &&
+    (
+      [
+        "mentor-topics",
+        "mentor-chat",
+        "query-category",
+        "query-form",
+        "mentor-resume-choice",
+        "live-chat",
+      ] as FlowStep[]
+    ).includes(flowStep);
+
+  const renderResumeBanner = (variant: "inline" | "standalone" = "inline") => {
+    if (
+      !hasActiveConversation ||
+      !selectedConversation ||
+      selectedConversation.status === "CLOSED"
+    )
+      return null;
+    return (
+      <button
+        className={`cw-resume-banner ${variant === "inline" ? "cw-resume-banner--inline" : ""}`}
+        onClick={handleResumeConversation}
+        type="button"
+      >
+        <span className="cw-resume-banner-icon">
+          <MessageSquare size={16} />
+        </span>
+        <span className="cw-resume-banner-text">
+          <span className="cw-resume-banner-title">
+            You have an ongoing conversation
+          </span>
+          <span className="cw-resume-banner-sub">
+            {selectedConversation.category_name
+              ? `About ${selectedConversation.category_name} — tap to resume`
+              : "Tap to resume"}
+          </span>
+        </span>
+        <span className="cw-resume-banner-arrow">
+          <ArrowLeft size={14} style={{ transform: "rotate(180deg)" }} />
+        </span>
+      </button>
+    );
+  };
 
   const renderContent = () => {
     if (flowStep === "faq-list")
       return (
         <div className="cw-faqlist-wrap">
+          {renderResumeBanner("inline")}
           <div className="cw-section-title">
             <span className="cw-section-icon">
               <MessageSquare size={15} />
@@ -3456,6 +3704,7 @@ function ChatWidgetInner() {
               Not you? Update details
             </button>
           </div>
+          {renderResumeBanner("standalone")}
           <button
             className="cw-option-btn cw-option-chat"
             onClick={handleChatWithBot}
@@ -3501,41 +3750,104 @@ function ChatWidgetInner() {
               </span>
             </div>
           </button>
-        </div>
-      );
-    if (flowStep === "post-chat-options")
-      return (
-        <div className="cw-options-wrap">
-          <div className="cw-section-title">What would you like to do?</div>
           <button
-            className="cw-option-btn cw-option-chat"
-            onClick={handleChatWithBot}
+            className="cw-option-btn cw-option-end"
+            onClick={handleEndChat}
             type="button"
           >
             <div className="cw-option-icon">
-              <Bot size={20} />
+              <DoorOpen size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">Chat with Nimo Bot</span>
+              <span className="cw-option-label">End Chat</span>
               <span className="cw-option-desc">
-                Get instant answers from Nimo Bot AI
+                Close this conversation for now
+              </span>
+            </div>
+          </button>
+        </div>
+      );
+    if (flowStep === "mentor-resume-choice")
+      return (
+        <div className="cw-options-wrap">
+          <button
+            className="cw-option-btn cw-option-chat"
+            onClick={handleResumeConversation}
+            type="button"
+          >
+            <div className="cw-option-icon">
+              <MessageSquare size={20} />
+            </div>
+            <div className="cw-option-text">
+              <span className="cw-option-label">Resume Conversation</span>
+              <span className="cw-option-desc">
+                Continue chatting with{" "}
+                {autoSelectedExpert?.name ??
+                  selectedConversation?.category_name ??
+                  "your mentor"}
               </span>
             </div>
           </button>
           <button
-            className="cw-option-btn cw-option-query"
-            onClick={handleStartQueryForm}
+            className="cw-option-btn cw-option-mentor"
+            onClick={handleStartNewMentorTopic}
             type="button"
           >
             <div className="cw-option-icon">
-              <FileText size={20} />
+              <Users size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">Raise a Query</span>
+              <span className="cw-option-label">Start a New Topic</span>
               <span className="cw-option-desc">
-                Not satisfied? Log a ticket for our team
+                Talk to a different mentor about something else
               </span>
             </div>
+          </button>
+        </div>
+      );
+    if (flowStep === "query-category")
+      return (
+        <div className="cw-categories-wrap">
+          <div className="cw-section-title">
+            <span className="cw-section-icon">
+              <ClipboardList size={15} />
+            </span>
+            Which category is this about?
+          </div>
+          {expertsLoading && (
+            <div className="cw-skeleton-list">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="cw-skeleton-card" />
+              ))}
+            </div>
+          )}
+          {!expertsLoading && expertCategories.length === 0 && (
+            <div className="cw-empty-state">No categories available.</div>
+          )}
+          {!expertsLoading && expertCategories.length > 0 && (
+            <div className="cw-categories-grid">
+              {expertCategories.map((cat, i) => (
+                <button
+                  key={cat.category_generated_id ?? i}
+                  className="cw-category-card"
+                  style={{ animationDelay: `${i * 0.06}s` }}
+                  onClick={() => handleQueryCategorySelect(cat)}
+                  type="button"
+                >
+                  <span className="cw-category-icon">
+                    <ClipboardList size={18} />
+                  </span>
+                  <span className="cw-category-name">{cat.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            className="cw-skip-category-btn"
+            onClick={handleSkipQueryCategory}
+            type="button"
+          >
+            Skip — I&apos;m not sure which category
           </button>
         </div>
       );
@@ -3552,6 +3864,19 @@ function ChatWidgetInner() {
               <span>{displayContact.email}</span>
             </div>
           </div>
+          {requestQuery.category && (
+            <div className="cw-query-category-badge">
+              <ClipboardList size={12} />
+              <span>{requestQuery.category}</span>
+              <button
+                type="button"
+                className="cw-query-category-change"
+                onClick={() => setFlowStep("query-category")}
+              >
+                Change
+              </button>
+            </div>
+          )}
           <form className="cw-query-form" onSubmit={handleSubmitQuery}>
             <div className="cw-query-field">
               <label className="cw-query-label">
@@ -3635,11 +3960,17 @@ function ChatWidgetInner() {
                 </span>
               )}
             </div>
+            {localValidationErrors.category && (
+              <span className="cw-query-error">
+                {localValidationErrors.category}
+              </span>
+            )}
             <button
               type="submit"
               className="cw-query-submit-btn"
               disabled={
                 requestQueryLoading ||
+                !requestQuery.category ||
                 !isValidQueryTitle(requestQuery.query_title) ||
                 !isValidQueryDescription(requestQuery.query_description)
               }
@@ -3758,6 +4089,17 @@ function ChatWidgetInner() {
                 </span>
               </div>
             </div>
+            {showHomeButton && (
+              <button
+                className="cw-header-home-btn"
+                onClick={handleGoHome}
+                type="button"
+                aria-label="Switch mode"
+                title="Switch mode"
+              >
+                <Home size={16} />
+              </button>
+            )}
             <button
               className="cw-close-btn"
               onClick={() => setIsOpen(false)}
@@ -3949,7 +4291,8 @@ function ChatWidgetInner() {
             {renderContent()}
             {(isTyping ||
               (flowStep === "live-chat" && chatbotLoading) ||
-              (flowStep === "mentor-topics" && expertsLoading)) && (
+              (flowStep === "mentor-topics" && expertsLoading) ||
+              (flowStep === "query-category" && expertsLoading)) && (
               <div className="cw-msg">
                 <div className="cw-avatar cw-avatar--bot">
                   <Bot size={13} />
