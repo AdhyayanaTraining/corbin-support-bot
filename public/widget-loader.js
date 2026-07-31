@@ -54,33 +54,95 @@
   iframe.setAttribute("allowtransparency", "true");
 
   // =====================================================
-  // STYLE
+  // STYLE HELPERS
   // =====================================================
 
-  iframe.style.position = "fixed";
-  iframe.style.right = "20px";
-  iframe.style.bottom = "20px";
+  // Sets a single CSS property with !important priority, so the host
+  // page's stylesheet (even its own !important rules on `iframe` /
+  // `#nimobot-iframe`) cannot shrink, hide, or reposition the widget.
+  // A plain `el.style.width = "130px"` loses to an external
+  // `iframe { width: auto !important }` rule — setProperty with the
+  // "important" priority flag does not.
+  function setImportant(el, prop, value) {
+    el.style.setProperty(prop, value, "important");
+  }
 
-  iframe.style.width = BUBBLE_SIZE.width;
-  iframe.style.height = BUBBLE_SIZE.height;
-
-  iframe.style.border = "none";
-  iframe.style.background = "transparent";
-  iframe.style.backgroundColor = "transparent";
-  iframe.style.overflow = "hidden";
-
-  iframe.style.zIndex = "2147483647";
-
-  iframe.style.transition =
-    "width .25s ease,height .25s ease,right .25s ease,bottom .25s ease";
-
-  // =====================================================
-  // MOBILE
-  // =====================================================
+  function applyBoxStyles(styles) {
+    Object.keys(styles).forEach(function (prop) {
+      setImportant(iframe, prop, styles[prop]);
+    });
+  }
 
   function isMobile() {
     return window.innerWidth <= 480;
   }
+
+  function setBubbleBox() {
+    applyBoxStyles({
+      right: "20px",
+      bottom: "20px",
+      left: "auto",
+      top: "auto",
+      width: BUBBLE_SIZE.width,
+      height: BUBBLE_SIZE.height,
+      "max-width": BUBBLE_SIZE.width,
+      "max-height": BUBBLE_SIZE.height,
+      "min-width": BUBBLE_SIZE.width,
+      "min-height": BUBBLE_SIZE.height,
+    });
+  }
+
+  function setPanelBox() {
+    if (isMobile()) {
+      applyBoxStyles({
+        right: "0",
+        bottom: "0",
+        left: "auto",
+        top: "auto",
+        width: MOBILE_PANEL_SIZE.width,
+        height: MOBILE_PANEL_SIZE.height,
+        "max-width": MOBILE_PANEL_SIZE.width,
+        "max-height": MOBILE_PANEL_SIZE.height,
+        "min-width": MOBILE_PANEL_SIZE.width,
+        "min-height": MOBILE_PANEL_SIZE.height,
+      });
+    } else {
+      applyBoxStyles({
+        right: "20px",
+        bottom: "20px",
+        left: "auto",
+        top: "auto",
+        width: PANEL_SIZE.width,
+        height: PANEL_SIZE.height,
+        "max-width": PANEL_SIZE.width,
+        "max-height": PANEL_SIZE.height,
+        "min-width": PANEL_SIZE.width,
+        "min-height": PANEL_SIZE.height,
+      });
+    }
+  }
+
+  // =====================================================
+  // BASE STYLE (applied once, before mount)
+  // =====================================================
+
+  applyBoxStyles({
+    position: "fixed",
+    right: "20px",
+    bottom: "20px",
+    width: BUBBLE_SIZE.width,
+    height: BUBBLE_SIZE.height,
+    border: "none",
+    background: "transparent",
+    "background-color": "transparent",
+    overflow: "hidden",
+    "z-index": "2147483647",
+    display: "block",
+    visibility: "visible",
+    opacity: "1",
+    transition:
+      "width .25s ease,height .25s ease,right .25s ease,bottom .25s ease",
+  });
 
   // =====================================================
   // OPEN / CLOSE
@@ -96,24 +158,11 @@
     if (event.data.source !== "nimobot-widget") return;
 
     if (event.data.type === "OPEN") {
-      if (isMobile()) {
-        iframe.style.right = "0";
-        iframe.style.bottom = "0";
-        iframe.style.width = MOBILE_PANEL_SIZE.width;
-        iframe.style.height = MOBILE_PANEL_SIZE.height;
-      } else {
-        iframe.style.right = "20px";
-        iframe.style.bottom = "20px";
-        iframe.style.width = PANEL_SIZE.width;
-        iframe.style.height = PANEL_SIZE.height;
-      }
+      setPanelBox();
     }
 
     if (event.data.type === "CLOSE") {
-      iframe.style.right = "20px";
-      iframe.style.bottom = "20px";
-      iframe.style.width = BUBBLE_SIZE.width;
-      iframe.style.height = BUBBLE_SIZE.height;
+      setBubbleBox();
     }
   });
 
@@ -123,18 +172,7 @@
 
   window.addEventListener("resize", function () {
     if (iframe.style.width === BUBBLE_SIZE.width) return;
-
-    if (isMobile()) {
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = MOBILE_PANEL_SIZE.width;
-      iframe.style.height = MOBILE_PANEL_SIZE.height;
-    } else {
-      iframe.style.right = "20px";
-      iframe.style.bottom = "20px";
-      iframe.style.width = PANEL_SIZE.width;
-      iframe.style.height = PANEL_SIZE.height;
-    }
+    setPanelBox();
   });
 
   // =====================================================
