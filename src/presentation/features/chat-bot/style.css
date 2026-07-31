@@ -40,10 +40,10 @@
 }
 
 /* ============ LAUNCHER ============ */
-/* Mobile-responsive launcher - not too big, not too small */
+/* Launcher fills the iframe - loader controls the actual size */
 .cw-launcher {
-  width: 130px;
-  height: 130px;
+  width: 100%;
+  height: 100%;
   background: transparent !important;
   border: none;
   padding: 0;
@@ -1358,15 +1358,11 @@
   color: #dce8ff;
 }
 
-/* ============ RESPONSIVE - Mobile optimized ============ */
+/* ============ RESPONSIVE - Mobile ============ */
 @media (max-width: 480px) {
   .cw-root {
     bottom: 16px;
     right: 16px;
-  }
-  .cw-launcher {
-    width: 56px;
-    height: 56px;
   }
   .cw-panel {
     width: calc(100vw - 32px);
@@ -1447,10 +1443,6 @@
 
 /* ============ RESPONSIVE - Tablet ============ */
 @media (min-width: 481px) and (max-width: 768px) {
-  .cw-launcher {
-    width: 64px;
-    height: 64px;
-  }
   .cw-panel {
     width: 380px;
     height: 600px;
