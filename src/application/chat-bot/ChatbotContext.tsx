@@ -50,7 +50,11 @@ interface ChatbotContextType {
 
   errors: ChatValidationErrors;
 
+  selectedLanguage: string;
+
   handleChange: (e: ChangeEvent<HTMLInputElement>) => void;
+
+  changeLanguage: (language: string) => void;
 
   resetForm: () => void;
 
@@ -79,6 +83,8 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
   const [errors, setErrors] = useState<ChatValidationErrors>({});
 
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
+
   // ======================================================
   // HANDLE CHANGE
   // ======================================================
@@ -97,6 +103,18 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         [name]: "",
       }));
     }
+  };
+
+  // ======================================================
+  // CHANGE LANGUAGE
+  // ======================================================
+
+  const changeLanguage = (language: string) => {
+    setSelectedLanguage(language);
+    setQuestion((prev) => ({
+      ...prev,
+      language,
+    }));
   };
 
   // ======================================================
@@ -135,7 +153,13 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         },
       ]);
 
-      const result = await ChatbotService.askQuestion(question);
+      // Pass the selected language along with the question
+      const payloadWithLanguage = {
+        ...question,
+        language: selectedLanguage,
+      };
+
+      const result = await ChatbotService.askQuestion(payloadWithLanguage);
 
       if (!result.success) {
         return false;
@@ -178,7 +202,11 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
     errors,
 
+    selectedLanguage,
+
     handleChange,
+
+    changeLanguage,
 
     resetForm,
 
