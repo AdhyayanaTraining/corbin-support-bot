@@ -36,12 +36,14 @@ export interface ChatResponse {
 
 export interface AskQuestionPayload {
   question: string;
-}
 
+  language: string;
+}
 // ======================================================
 // EMPTY PAYLOAD
 // ======================================================
 
 export const EMPTY_CHAT_PAYLOAD: AskQuestionPayload = {
   question: "",
+  language: "en",
 };

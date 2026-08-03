@@ -2,2013 +2,6 @@
 // /* eslint-disable react-hooks/preserve-manual-memoization */
 // /* eslint-disable react-hooks/set-state-in-effect */
 // /* eslint-disable @typescript-eslint/no-explicit-any */
-// "use client";
-
-// import {
-//   useState,
-//   useRef,
-//   useEffect,
-//   FormEvent,
-//   ChangeEvent,
-//   useCallback,
-//   JSX,
-// } from "react";
-// import {
-//   MessageCircle,
-//   User,
-//   X,
-//   ArrowLeft,
-//   FileText,
-//   Send,
-//   Sparkles,
-//   Phone,
-//   Mail,
-//   Bot,
-//   Check,
-//   Folder,
-//   HelpCircle,
-//   MessageSquareWarning,
-//   Loader2,
-//   Pencil,
-//   ClipboardList,
-//   Users,
-//   MessageSquare,
-//   Clock,
-//   CheckCheck,
-//   PartyPopper,
-//   DoorOpen,
-//   Home,
-// } from "lucide-react";
-// import ReactMarkdown from "react-markdown";
-// import remarkGfm from "remark-gfm";
-// import rehypeHighlight from "rehype-highlight";
-// import "highlight.js/styles/github.css";
-// import "./style.css";
-
-// import { FAQProvider, useFAQ } from "@/src/application/faq/FaqContext";
-// import {
-//   ChatbotProvider,
-//   useChatbot,
-// } from "@/src/application/chat-bot/ChatbotContext";
-// import {
-//   WebsiteUserProvider,
-//   useWebsiteUser,
-// } from "@/src/application/website-users/WebsiteUserContext";
-// import {
-//   RequestQueryProvider,
-//   useRequestQuery,
-// } from "@/src/application/request_a_query/RequestQueryContext";
-// import { ChatProvider, useChat } from "@/src/application/live-chat/ChatContext";
-// import { UserProvider, useUser } from "@/src/application/users/UserContext";
-// import type {
-//   FAQ,
-//   FAQCategory,
-//   FAQQuestion,
-// } from "@/src/application/faq/faq.types";
-// import type {
-//   User as ExpertUser,
-//   ExpertCategory,
-// } from "@/src/application/users/user.types";
-
-// type Sender = "bot" | "user";
-
-// interface Message {
-//   id: string;
-//   sender: Sender;
-//   text: string;
-// }
-
-// type FlowStep =
-//   | "faq-list"
-//   | "faq-categories"
-//   | "faq-questions"
-//   | "mentor-form"
-//   | "mentor-options"
-//   | "post-chat-options"
-//   | "query-form"
-//   | "live-chat"
-//   | "mentor-topics"
-//   | "mentor-chat";
-
-// type MentorFormStep = "name" | "mobile" | "email";
-
-// type SatisfactionStage = "ask" | "closed" | null;
-
-// interface ContactDetails {
-//   name: string;
-//   mobile: string;
-//   email: string;
-//   registered_employee_generated_id?: string;
-// }
-
-// interface ValidationErrors {
-//   name?: string;
-//   mobile?: string;
-//   email?: string;
-//   query_title?: string;
-//   query_description?: string;
-//   message?: string;
-// }
-
-// const MENTOR_STEPS: {
-//   key: MentorFormStep;
-//   label: string;
-//   icon: JSX.Element;
-// }[] = [
-//   { key: "name", label: "Name", icon: <User size={12} /> },
-//   { key: "mobile", label: "Mobile", icon: <Phone size={12} /> },
-//   { key: "email", label: "Email", icon: <Mail size={12} /> },
-// ];
-
-// // ========== VALIDATION FUNCTIONS ==========
-
-// const isValidName = (value: string) => {
-//   const name = value.trim();
-//   if (name.length < 3) return false;
-//   return /^[A-Za-z\s'-]+$/.test(name);
-// };
-
-// const isValidMobile = (value: string) => {
-//   return /^[0-9]{10,15}$/.test(value.trim());
-// };
-
-// const isValidEmail = (value: string) => {
-//   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-// };
-
-// const isValidQueryTitle = (value: string) => {
-//   const title = value.trim();
-//   return title.length >= 5 && title.length <= 100;
-// };
-
-// const isValidQueryDescription = (value: string) => {
-//   const desc = value.trim();
-//   return desc.length >= 10 && desc.length <= 1000;
-// };
-
-// const isValidChatMessage = (value: string) => {
-//   return value.trim().length > 0 && value.trim().length <= 1000;
-// };
-
-// // Sanitize name: trim and normalize spaces
-// const sanitizeName = (value: string) => {
-//   return value.trim().replace(/\s+/g, " ");
-// };
-
-// const welcomeMessage = (): Message => ({
-//   id: "greet-1",
-//   sender: "bot",
-//   text: "Hi there! I'm **SupportBot**, your AI Assistant. Pick a question below and I'll help you.",
-// });
-
-// const CONTACT_STORAGE_KEY = "supportbot_contact_details";
-
-// function ChatWidgetInner() {
-//   const { faqs, loading: faqsLoading } = useFAQ();
-//   const {
-//     messages: chatbotMessages,
-//     question: chatbotQuestion,
-//     errors: chatbotErrors,
-//     loading: chatbotLoading,
-//     handleChange: handleChatbotChange,
-//     askQuestion,
-//     resetForm: resetChatbotForm,
-//   } = useChatbot();
-//   const {
-//     handleChange: handleWebsiteUserChange,
-//     addWebsiteUser,
-//     resetForm: resetWebsiteUserForm,
-//     registeredEmployeeId,
-//   } = useWebsiteUser();
-//   const {
-//     requestQuery,
-//     errors: requestQueryErrors,
-//     loading: requestQueryLoading,
-//     handleChange: handleRequestQueryChange,
-//     addRequestQuery,
-//     resetForm: resetRequestQueryForm,
-//   } = useRequestQuery();
-//   const {
-//     messages: mentorMessages,
-//     conversations,
-//     selectedConversation,
-//     message: mentorMessage,
-//     errors: mentorErrors,
-//     loading: mentorLoading,
-//     setSelectedConversation,
-//     handleMessageChange: handleMentorMessageChange,
-//     resetConversation: resetMentorConversation,
-//     resetMessage: resetMentorMessage,
-//     createConversation,
-//     getVisitorConversations,
-//     sendMessage: sendMentorMessage,
-//     getConversationMessages,
-//     joinRoom,
-//     leaveRoom,
-//   } = useChat();
-//   const {
-//     expertCategories,
-//     getExpertCategories,
-//     getExpertsByCategory,
-//     getExpertsByCategoryId,
-//     loading: expertsLoading,
-//   } = useUser();
-
-//   const isEmbedded =
-//     typeof window !== "undefined" && window.self !== window.top;
-//   const [isOpen, setIsOpen] = useState(isEmbedded);
-//   const [messages, setMessages] = useState<Message[]>([welcomeMessage()]);
-//   const [draft, setDraft] = useState("");
-//   const [isTyping, setIsTyping] = useState(false);
-//   const [flowStep, setFlowStep] = useState<FlowStep>("faq-list");
-//   const [selectedFAQ, setSelectedFAQ] = useState<FAQ | null>(null);
-//   const [selectedCategory, setSelectedCategory] = useState<FAQCategory | null>(
-//     null,
-//   );
-//   const [selectedQuestion, setSelectedQuestion] = useState<FAQQuestion | null>(
-//     null,
-//   );
-//   const [mentorForm, setMentorForm] = useState<ContactDetails>({
-//     name: "",
-//     mobile: "",
-//     email: "",
-//     registered_employee_generated_id: "",
-//   });
-//   const [mentorFormStep, setMentorFormStep] = useState<MentorFormStep>("name");
-//   const [formError, setFormError] = useState<string | null>(null);
-//   const [savedContact, setSavedContact] = useState<ContactDetails | null>(null);
-//   const [isSavingContact, setIsSavingContact] = useState(false);
-//   const [submitTrigger, setSubmitTrigger] = useState(0);
-//   const [waitingForEmployeeId, setWaitingForEmployeeId] = useState(false);
-//   const pendingContactRef = useRef<ContactDetails | null>(null);
-//   const [querySubmitTrigger, setQuerySubmitTrigger] = useState(0);
-//   const [autoSelectedExpert, setAutoSelectedExpert] =
-//     useState<ExpertUser | null>(null);
-//   const [selectedExpertCategory, setSelectedExpertCategory] =
-//     useState<ExpertCategory | null>(null);
-//   const [connectingCategoryId, setConnectingCategoryId] = useState<
-//     string | null
-//   >(null);
-//   const messagesEndRef = useRef<HTMLDivElement>(null);
-//   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-//   const hasSavedContact = useRef(false);
-//   const [conversationEnded, setConversationEnded] = useState(false);
-//   const conversationEndedNotifiedRef = useRef(false);
-//   const [satisfactionStage, setSatisfactionStage] =
-//     useState<SatisfactionStage>(null);
-
-//   // Local validation errors for mentor form and query form
-//   const [localValidationErrors, setLocalValidationErrors] =
-//     useState<ValidationErrors>({});
-
-//   useEffect(() => {
-//     try {
-//       const raw = window.localStorage.getItem(CONTACT_STORAGE_KEY);
-//       if (raw) {
-//         const parsed = JSON.parse(raw) as Partial<ContactDetails>;
-//         if (parsed?.name && parsed?.email && parsed?.mobile) {
-//           const contact: ContactDetails = {
-//             name: parsed.name,
-//             mobile: parsed.mobile,
-//             email: parsed.email,
-//             registered_employee_generated_id:
-//               parsed.registered_employee_generated_id || "",
-//           };
-//           setSavedContact(contact);
-//           if (contact.registered_employee_generated_id)
-//             getVisitorConversations(contact.registered_employee_generated_id);
-//         }
-//       }
-//     } catch (err) {}
-//   }, []);
-
-//   useEffect(() => {
-//     if (!conversations || conversations.length === 0) return;
-//     if (flowStep === "mentor-chat") return;
-//     const latestConversation = [...conversations].sort(
-//       (a, b) =>
-//         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-//     )[0];
-//     if (latestConversation) {
-//       setSelectedConversation(latestConversation);
-//       getConversationMessages(latestConversation.conversation_generated_id);
-//       if (latestConversation.status === "CLOSED") setConversationEnded(true);
-//       setFlowStep("mentor-chat");
-//     }
-//   }, [conversations]);
-
-//   useEffect(() => {
-//     if (flowStep !== "mentor-chat") {
-//       conversationEndedNotifiedRef.current = false;
-//       return;
-//     }
-//     if (
-//       selectedConversation?.status === "CLOSED" &&
-//       !conversationEndedNotifiedRef.current
-//     ) {
-//       conversationEndedNotifiedRef.current = true;
-//       setConversationEnded(true);
-//       setSatisfactionStage("ask");
-//       pushMessage("bot", "This conversation has been ended by the mentor.");
-//       simulateTyping(
-//         "Was everything sorted out? Let me know if you're all set, or raise a query if something's still unresolved.",
-//       );
-//     }
-//   }, [selectedConversation?.status, flowStep]);
-
-//   useEffect(() => {
-//     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-//   }, [messages, isTyping, flowStep, chatbotMessages, mentorMessages]);
-
-//   useEffect(() => {
-//     return () => {
-//       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-//     };
-//   }, []);
-
-//   useEffect(() => {
-//     if (!isEmbedded) return;
-//     window.parent.postMessage(
-//       { source: "supportbot-widget", type: isOpen ? "OPEN" : "CLOSE" },
-//       "*",
-//     );
-//   }, [isOpen, isEmbedded]);
-
-//   useEffect(() => {
-//     const cid = selectedConversation?.conversation_generated_id;
-//     if (flowStep !== "mentor-chat" || !cid) return;
-//     joinRoom(cid);
-//     getConversationMessages(cid);
-//     return () => {
-//       leaveRoom(cid);
-//     };
-//   }, [flowStep, selectedConversation?.conversation_generated_id]);
-
-//   const pushMessage = useCallback((sender: Sender, text: string) => {
-//     setMessages((prev) => [
-//       ...prev,
-//       { id: `${Date.now()}-${sender}-${Math.random()}`, sender, text },
-//     ]);
-//   }, []);
-
-//   const simulateTyping = useCallback(
-//     (text: string, delay = 550) => {
-//       if (typingTimeoutRef.current) {
-//         clearTimeout(typingTimeoutRef.current);
-//         typingTimeoutRef.current = null;
-//       }
-//       setIsTyping(true);
-//       typingTimeoutRef.current = setTimeout(() => {
-//         setIsTyping(false);
-//         pushMessage("bot", text);
-//         typingTimeoutRef.current = null;
-//       }, delay);
-//     },
-//     [pushMessage],
-//   );
-
-//   useEffect(() => {
-//     if (submitTrigger === 0 || hasSavedContact.current) return;
-//     let c = false;
-//     hasSavedContact.current = true;
-//     setIsSavingContact(true);
-//     (async () => {
-//       try {
-//         const ok = await addWebsiteUser();
-//         if (c) return;
-//         setIsSavingContact(false);
-//         if (ok) {
-//           setWaitingForEmployeeId(true);
-//           setIsTyping(false);
-//         } else {
-//           setIsTyping(false);
-//           pushMessage(
-//             "bot",
-//             "Hmm, I couldn't save your details just now. Please try again.",
-//           );
-//           setMentorFormStep("email");
-//           setDraft("");
-//           setFlowStep("mentor-form");
-//           hasSavedContact.current = false;
-//         }
-//       } catch (err) {
-//         if (c) return;
-//         setIsSavingContact(false);
-//         setIsTyping(false);
-//         pushMessage(
-//           "bot",
-//           "Something went wrong saving your details. Please try again.",
-//         );
-//         setMentorFormStep("email");
-//         setDraft("");
-//         setFlowStep("mentor-form");
-//         hasSavedContact.current = false;
-//       }
-//     })();
-//     return () => {
-//       c = true;
-//     };
-//   }, [submitTrigger]);
-
-//   useEffect(() => {
-//     if (!waitingForEmployeeId || !registeredEmployeeId) return;
-//     const contact = pendingContactRef.current;
-//     if (!contact) return;
-//     const updated: ContactDetails = {
-//       ...contact,
-//       registered_employee_generated_id: registeredEmployeeId,
-//     };
-//     setSavedContact(updated);
-//     try {
-//       window.localStorage.setItem(CONTACT_STORAGE_KEY, JSON.stringify(updated));
-//     } catch (err) {}
-//     pushMessage(
-//       "bot",
-//       `Thanks, **${contact.name}**! I've saved your details.\n\nHow would you like to proceed?`,
-//     );
-//     setFlowStep("mentor-options");
-//     setWaitingForEmployeeId(false);
-//     hasSavedContact.current = false;
-//   }, [waitingForEmployeeId, registeredEmployeeId]);
-
-//   useEffect(() => {
-//     if (querySubmitTrigger === 0) return;
-//     let c = false;
-//     (async () => {
-//       try {
-//         const ok = await addRequestQuery();
-//         if (c) return;
-//         if (ok) {
-//           pushMessage(
-//             "bot",
-//             `Your query has been registered!\n\nTicket: **TKT-${Date.now().toString(36).toUpperCase()}**`,
-//           );
-//           setFlowStep("faq-list");
-//         } else
-//           pushMessage(
-//             "bot",
-//             "I couldn't submit your query — please try again.",
-//           );
-//       } catch (err) {
-//         if (c) return;
-//         pushMessage(
-//           "bot",
-//           "Something went wrong submitting your query. Please try again.",
-//         );
-//       }
-//     })();
-//     return () => {
-//       c = true;
-//     };
-//   }, [querySubmitTrigger]);
-
-//   // ========== INPUT HANDLERS WITH REAL-TIME VALIDATION ==========
-
-//   const handleNameInput = useCallback(
-//     (e: ChangeEvent<HTMLInputElement>) => {
-//       const value = e.target.value;
-//       // Prevent invalid characters from being typed
-//       const filtered = value.replace(/[^A-Za-z\s'-]/g, "");
-//       setDraft(filtered);
-//       if (formError) setFormError(null);
-
-//       // Real-time validation
-//       if (filtered.trim().length > 0 && filtered.trim().length < 3) {
-//         setLocalValidationErrors((prev) => ({
-//           ...prev,
-//           name: "Please enter your full name (minimum 3 characters).",
-//         }));
-//       } else if (filtered.trim().length > 0 && !isValidName(filtered)) {
-//         setLocalValidationErrors((prev) => ({
-//           ...prev,
-//           name: "Only letters, spaces, apostrophes (') and hyphens (-) are allowed.",
-//         }));
-//       } else {
-//         setLocalValidationErrors((prev) => {
-//           const { name, ...rest } = prev;
-//           return rest;
-//         });
-//       }
-//     },
-//     [formError],
-//   );
-
-//   const handleMobileInput = useCallback(
-//     (e: ChangeEvent<HTMLInputElement>) => {
-//       const value = e.target.value;
-//       // Allow only digits
-//       const digits = value.replace(/\D/g, "");
-//       // Limit to 15 digits
-//       const limited = digits.slice(0, 15);
-//       setDraft(limited);
-//       if (formError) setFormError(null);
-
-//       // Real-time validation
-//       if (limited.length > 0 && limited.length < 10) {
-//         setLocalValidationErrors((prev) => ({
-//           ...prev,
-//           mobile: "Please enter a valid mobile number (10-15 digits).",
-//         }));
-//       } else if (limited.length > 15) {
-//         setLocalValidationErrors((prev) => ({
-//           ...prev,
-//           mobile: "Mobile number cannot exceed 15 digits.",
-//         }));
-//       } else {
-//         setLocalValidationErrors((prev) => {
-//           const { mobile, ...rest } = prev;
-//           return rest;
-//         });
-//       }
-//     },
-//     [formError],
-//   );
-
-//   const handleEmailInput = useCallback(
-//     (e: ChangeEvent<HTMLInputElement>) => {
-//       const value = e.target.value;
-//       setDraft(value);
-//       if (formError) setFormError(null);
-
-//       // Real-time validation
-//       if (value.trim().length > 0 && !isValidEmail(value)) {
-//         setLocalValidationErrors((prev) => ({
-//           ...prev,
-//           email: "Please enter a valid email address.",
-//         }));
-//       } else {
-//         setLocalValidationErrors((prev) => {
-//           const { email, ...rest } = prev;
-//           return rest;
-//         });
-//       }
-//     },
-//     [formError],
-//   );
-
-//   const handleChatMessageInput = useCallback(
-//     (e: ChangeEvent<HTMLInputElement>) => {
-//       const value = e.target.value;
-//       handleChatbotChange(e);
-
-//       // Real-time validation for chat message
-//       if (value.trim().length === 0) {
-//         // Don't show error for empty input while typing
-//       } else if (value.trim().length > 1000) {
-//         setLocalValidationErrors((prev) => ({
-//           ...prev,
-//           message: "Message cannot exceed 1000 characters.",
-//         }));
-//       } else {
-//         setLocalValidationErrors((prev) => {
-//           const { message, ...rest } = prev;
-//           return rest;
-//         });
-//       }
-//     },
-//     [handleChatbotChange],
-//   );
-
-//   const handleMentorMessageInput = useCallback(
-//     (e: ChangeEvent<HTMLInputElement>) => {
-//       const value = e.target.value;
-//       handleMentorMessageChange(e);
-
-//       // Real-time validation for mentor message
-//       if (value.trim().length > 1000) {
-//         setLocalValidationErrors((prev) => ({
-//           ...prev,
-//           message: "Message cannot exceed 1000 characters.",
-//         }));
-//       } else {
-//         setLocalValidationErrors((prev) => {
-//           const { message, ...rest } = prev;
-//           return rest;
-//         });
-//       }
-//     },
-//     [handleMentorMessageChange],
-//   );
-
-//   // ========== QUERY FORM VALIDATION ==========
-
-//   const validateQueryForm = useCallback((): boolean => {
-//     const errors: ValidationErrors = {};
-//     let isValid = true;
-
-//     if (
-//       !requestQuery.query_title ||
-//       !isValidQueryTitle(requestQuery.query_title)
-//     ) {
-//       errors.query_title = "Please enter a query title (minimum 5 characters).";
-//       isValid = false;
-//     }
-
-//     if (
-//       !requestQuery.query_description ||
-//       !isValidQueryDescription(requestQuery.query_description)
-//     ) {
-//       errors.query_description =
-//         "Please describe your issue in at least 10 characters.";
-//       isValid = false;
-//     }
-
-//     setLocalValidationErrors(errors);
-//     return isValid;
-//   }, [requestQuery.query_title, requestQuery.query_description]);
-
-//   const handleStart = useCallback(() => {
-//     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-//     setIsTyping(false);
-//     if (
-//       flowStep === "mentor-chat" &&
-//       selectedConversation?.conversation_generated_id
-//     )
-//       leaveRoom(selectedConversation.conversation_generated_id);
-//     setFlowStep("faq-list");
-//     setSelectedFAQ(null);
-//     setSelectedCategory(null);
-//     setSelectedQuestion(null);
-//     setMentorForm({
-//       name: "",
-//       mobile: "",
-//       email: "",
-//       registered_employee_generated_id: "",
-//     });
-//     setMentorFormStep("name");
-//     setFormError(null);
-//     setDraft("");
-//     setWaitingForEmployeeId(false);
-//     setConversationEnded(false);
-//     setSatisfactionStage(null);
-//     conversationEndedNotifiedRef.current = false;
-//     setAutoSelectedExpert(null);
-//     setConnectingCategoryId(null);
-//     hasSavedContact.current = false;
-//     setIsSavingContact(false);
-//     pendingContactRef.current = null;
-//     setLocalValidationErrors({});
-//     resetChatbotForm();
-//     resetWebsiteUserForm();
-//     resetRequestQueryForm();
-//     resetMentorConversation();
-//     resetMentorMessage();
-//     setSelectedExpertCategory(null);
-//     setMessages([welcomeMessage()]);
-//   }, [
-//     flowStep,
-//     selectedConversation,
-//     leaveRoom,
-//     resetChatbotForm,
-//     resetWebsiteUserForm,
-//     resetRequestQueryForm,
-//     resetMentorConversation,
-//     resetMentorMessage,
-//   ]);
-
-//   const handleBack = useCallback(() => {
-//     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-//     setIsTyping(false);
-//     setFormError(null);
-//     setLocalValidationErrors({});
-//     if (flowStep === "faq-categories") {
-//       setFlowStep("faq-list");
-//       setSelectedFAQ(null);
-//       setSelectedCategory(null);
-//       pushMessage("user", "Back");
-//       simulateTyping("Here are the FAQ questions again:");
-//     } else if (flowStep === "faq-questions") {
-//       setFlowStep("faq-categories");
-//       setSelectedCategory(null);
-//       setSelectedQuestion(null);
-//       pushMessage("user", "Back");
-//       simulateTyping("Here are the categories again:");
-//     } else if (flowStep === "query-form") {
-//       resetRequestQueryForm();
-//       setFlowStep("post-chat-options");
-//       pushMessage("user", "Back");
-//       simulateTyping("How would you like to proceed?");
-//     } else if (flowStep === "post-chat-options") {
-//       setFlowStep("mentor-options");
-//       pushMessage("user", "Back");
-//       simulateTyping("How would you like to proceed?");
-//     } else if (flowStep === "mentor-topics") {
-//       setFlowStep("mentor-options");
-//       pushMessage("user", "Back");
-//       simulateTyping("How would you like to proceed?");
-//     } else if (flowStep === "mentor-chat") {
-//       if (selectedConversation?.conversation_generated_id)
-//         leaveRoom(selectedConversation.conversation_generated_id);
-//       resetMentorConversation();
-//       resetMentorMessage();
-//       setConversationEnded(false);
-//       setSatisfactionStage(null);
-//       conversationEndedNotifiedRef.current = false;
-//       setAutoSelectedExpert(null);
-//       setFlowStep("mentor-topics");
-//       pushMessage("user", "Back");
-//       simulateTyping("Choose another topic.");
-//     } else if (
-//       flowStep === "mentor-form" ||
-//       flowStep === "mentor-options" ||
-//       flowStep === "live-chat"
-//     ) {
-//       handleStart();
-//     }
-//   }, [
-//     flowStep,
-//     selectedConversation,
-//     leaveRoom,
-//     resetMentorConversation,
-//     resetMentorMessage,
-//     pushMessage,
-//     simulateTyping,
-//     handleStart,
-//     resetRequestQueryForm,
-//   ]);
-
-//   const handleFaqSelect = useCallback(
-//     (faq: FAQ) => {
-//       setSelectedFAQ(faq);
-//       setSelectedCategory(null);
-//       setSelectedQuestion(null);
-//       setFlowStep("faq-categories");
-//       pushMessage("user", faq.faq_default_question);
-//       (faq.categories || []).length > 0
-//         ? simulateTyping("Here are the categories:")
-//         : simulateTyping("No categories yet.");
-//     },
-//     [pushMessage, simulateTyping],
-//   );
-
-//   const handleCategorySelect = useCallback(
-//     (cat: FAQCategory) => {
-//       setSelectedCategory(cat);
-//       setSelectedQuestion(null);
-//       setFlowStep("faq-questions");
-//       pushMessage("user", cat.topic_name || "Category");
-//       (cat.questions || []).length > 0
-//         ? simulateTyping("Here are the questions:")
-//         : simulateTyping("No questions yet.");
-//     },
-//     [pushMessage, simulateTyping],
-//   );
-
-//   const handleQuestionSelect = useCallback(
-//     (q: FAQQuestion) => {
-//       setSelectedQuestion(q);
-//       pushMessage("user", q.question_text);
-//       const answers = q.answers || [];
-//       answers.length > 0
-//         ? simulateTyping(
-//             answers
-//               .map((a) => a.answer_text)
-//               .filter(Boolean)
-//               .join("\n\n"),
-//           )
-//         : simulateTyping("No answer yet — contact support below.");
-//     },
-//     [pushMessage, simulateTyping],
-//   );
-
-//   const handleShowSatisfaction = useCallback(() => {
-//     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-//     pushMessage("user", "I need more help");
-//     if (savedContact) {
-//       if (selectedConversation && selectedConversation.status !== "CLOSED") {
-//         setIsTyping(true);
-//         typingTimeoutRef.current = setTimeout(() => {
-//           setIsTyping(false);
-//           pushMessage(
-//             "bot",
-//             `Welcome back, **${savedContact.name}**! Resuming...`,
-//           );
-//           setFlowStep("mentor-chat");
-//         }, 550);
-//       } else {
-//         setIsTyping(true);
-//         typingTimeoutRef.current = setTimeout(() => {
-//           setIsTyping(false);
-//           pushMessage("bot", `Welcome back, **${savedContact.name}**!`);
-//           setMentorForm(savedContact);
-//           setFlowStep("mentor-options");
-//         }, 550);
-//       }
-//       return;
-//     }
-//     setIsTyping(true);
-//     typingTimeoutRef.current = setTimeout(() => {
-//       setIsTyping(false);
-//       pushMessage("bot", "What's your **full name**?");
-//       setMentorForm({
-//         name: "",
-//         mobile: "",
-//         email: "",
-//         registered_employee_generated_id: "",
-//       });
-//       setMentorFormStep("name");
-//       setFormError(null);
-//       setLocalValidationErrors({});
-//       setDraft("");
-//       setFlowStep("mentor-form");
-//     }, 550);
-//   }, [pushMessage, savedContact, selectedConversation]);
-
-//   const handleEditContact = useCallback(() => {
-//     setSavedContact(null);
-//     setWaitingForEmployeeId(false);
-//     hasSavedContact.current = false;
-//     setIsSavingContact(false);
-//     pendingContactRef.current = null;
-//     setLocalValidationErrors({});
-//     resetWebsiteUserForm();
-//     try {
-//       window.localStorage.removeItem(CONTACT_STORAGE_KEY);
-//     } catch (err) {}
-//     pushMessage("user", "Update my details");
-//     setMentorForm({
-//       name: "",
-//       mobile: "",
-//       email: "",
-//       registered_employee_generated_id: "",
-//     });
-//     setMentorFormStep("name");
-//     setFormError(null);
-//     setDraft("");
-//     setIsTyping(true);
-//     typingTimeoutRef.current = setTimeout(() => {
-//       setIsTyping(false);
-//       pushMessage("bot", "What's your **full name**?");
-//       setFlowStep("mentor-form");
-//     }, 550);
-//   }, [pushMessage, resetWebsiteUserForm]);
-
-//   const handleMentorFormSubmit = useCallback(() => {
-//     const text = draft.trim();
-//     if (!text) return;
-
-//     if (mentorFormStep === "name") {
-//       if (!isValidName(text)) {
-//         setFormError("Please enter your full name (minimum 3 characters).");
-//         return;
-//       }
-//       setFormError(null);
-//       setLocalValidationErrors({});
-//       const sanitizedName = sanitizeName(text);
-//       pushMessage("user", sanitizedName);
-//       setMentorForm((p) => ({ ...p, name: sanitizedName }));
-//       setMentorFormStep("mobile");
-//       setDraft("");
-//       simulateTyping(`Nice to meet you, **${sanitizedName}**! Mobile number?`);
-//       return;
-//     }
-
-//     if (mentorFormStep === "mobile") {
-//       if (!isValidMobile(text)) {
-//         setFormError("Please enter a valid mobile number.");
-//         return;
-//       }
-//       setFormError(null);
-//       setLocalValidationErrors({});
-//       pushMessage("user", text);
-//       setMentorForm((p) => ({ ...p, mobile: text }));
-//       setMentorFormStep("email");
-//       setDraft("");
-//       simulateTyping("Email address?");
-//       return;
-//     }
-
-//     if (!isValidEmail(text)) {
-//       setFormError("Please enter a valid email address.");
-//       return;
-//     }
-//     setFormError(null);
-//     setLocalValidationErrors({});
-//     pushMessage("user", text);
-//     const finalForm: ContactDetails = {
-//       ...mentorForm,
-//       email: text,
-//       registered_employee_generated_id:
-//         savedContact?.registered_employee_generated_id || "",
-//     };
-//     setMentorForm(finalForm);
-//     setDraft("");
-//     handleWebsiteUserChange({
-//       target: { name: "name", value: finalForm.name },
-//     } as ChangeEvent<HTMLInputElement>);
-//     handleWebsiteUserChange({
-//       target: { name: "phone_number", value: finalForm.mobile },
-//     } as ChangeEvent<HTMLInputElement>);
-//     handleWebsiteUserChange({
-//       target: { name: "email", value: finalForm.email },
-//     } as ChangeEvent<HTMLInputElement>);
-//     pendingContactRef.current = finalForm;
-//     setIsTyping(true);
-//     setSubmitTrigger((n) => n + 1);
-//   }, [
-//     draft,
-//     mentorFormStep,
-//     mentorForm,
-//     savedContact,
-//     pushMessage,
-//     simulateTyping,
-//     handleWebsiteUserChange,
-//   ]);
-
-//   const handleChatWithBot = useCallback(() => {
-//     const c = savedContact ?? mentorForm;
-//     pushMessage("user", "Chat with Bot");
-//     simulateTyping(
-//       `You're now chatting with SupportBot AI, **${c.name}**. Ask me anything.`,
-//     );
-//     setFlowStep("live-chat");
-//   }, [savedContact, mentorForm, pushMessage, simulateTyping]);
-
-//   const handleStartQueryForm = useCallback(() => {
-//     const c = savedContact ?? mentorForm;
-//     handleRequestQueryChange({
-//       target: { name: "name", value: c.name },
-//     } as ChangeEvent<HTMLInputElement>);
-//     handleRequestQueryChange({
-//       target: { name: "email", value: c.email },
-//     } as ChangeEvent<HTMLInputElement>);
-//     handleRequestQueryChange({
-//       target: { name: "phone_number", value: c.mobile },
-//     } as ChangeEvent<HTMLInputElement>);
-//     handleRequestQueryChange({
-//       target: { name: "query_title", value: "" },
-//     } as ChangeEvent<HTMLInputElement>);
-//     handleRequestQueryChange({
-//       target: { name: "query_description", value: "" },
-//     } as ChangeEvent<HTMLTextAreaElement>);
-//     setLocalValidationErrors({});
-//     pushMessage("user", "Raise a Query");
-//     simulateTyping("Give me a title and details.");
-//     setFlowStep("query-form");
-//   }, [
-//     savedContact,
-//     mentorForm,
-//     pushMessage,
-//     simulateTyping,
-//     handleRequestQueryChange,
-//   ]);
-
-//   const handleRaiseQueryFromEnd = useCallback(() => {
-//     handleStartQueryForm();
-//   }, [handleStartQueryForm]);
-
-//   const handleConversationSatisfied = useCallback(() => {
-//     pushMessage("user", "All good, thanks!");
-//     simulateTyping(
-//       "Wonderful! Thank you for chatting with us today — it was a pleasure helping you. 🎉",
-//     );
-//     setSatisfactionStage("closed");
-//   }, [pushMessage, simulateTyping]);
-
-//   const handleExitChat = useCallback(() => {
-//     setIsOpen(false);
-//   }, []);
-
-//   const handleBackToHome = useCallback(() => {
-//     handleStart();
-//   }, [handleStart]);
-
-//   const handleShowMentorTopics = useCallback(async () => {
-//     if (selectedConversation && selectedConversation.status !== "CLOSED") {
-//       pushMessage("user", "Talk to a Mentor");
-//       simulateTyping("Resuming your conversation...");
-//       setFlowStep("mentor-chat");
-//       return;
-//     }
-//     pushMessage("user", "Talk to a Mentor");
-//     try {
-//       const cats = await getExpertCategories();
-//       if (cats.length > 0) {
-//         simulateTyping("Which topic?");
-//         setFlowStep("mentor-topics");
-//       } else {
-//         simulateTyping("No categories available.");
-//         setFlowStep("mentor-options");
-//       }
-//     } catch (err) {
-//       simulateTyping("Couldn't load mentor topics — please try again.");
-//       setFlowStep("mentor-options");
-//     }
-//   }, [pushMessage, simulateTyping, getExpertCategories, selectedConversation]);
-
-//   const handleMentorCategorySelect = useCallback(
-//     async (cat: ExpertCategory) => {
-//       if (connectingCategoryId) return;
-//       const catKey = cat.category_generated_id ?? cat.name;
-//       setConnectingCategoryId(catKey);
-//       pushMessage("user", cat.name);
-//       setSelectedExpertCategory(cat);
-//       setIsTyping(true);
-//       try {
-//         const experts = cat.category_generated_id
-//           ? await getExpertsByCategoryId(cat.category_generated_id)
-//           : await getExpertsByCategory(cat.name);
-//         setIsTyping(false);
-//         if (experts.length > 0) {
-//           const firstExpert = experts[0];
-//           setAutoSelectedExpert(firstExpert);
-//           pushMessage(
-//             "bot",
-//             `Connecting you with **${firstExpert.name}**, your mentor for **${cat.name}**...`,
-//           );
-//           const c = savedContact ?? mentorForm;
-//           const success = await createConversation({
-//             visitor_name: c.name,
-//             visitor_email: c.email,
-//             visitor_phone_number: c.mobile,
-//             visitor_generated_id: c.registered_employee_generated_id ?? "",
-//             category_generated_id: cat.category_generated_id ?? "",
-//             category_name: cat.name ?? "",
-//           });
-//           if (success) {
-//             pushMessage(
-//               "bot",
-//               `You're now talking to **${firstExpert.name}**. Say hello! 👋`,
-//             );
-//             setFlowStep("mentor-chat");
-//           } else {
-//             pushMessage(
-//               "bot",
-//               `Couldn't start the conversation with **${firstExpert.name}** — please try again.`,
-//             );
-//           }
-//         } else {
-//           pushMessage(
-//             "bot",
-//             `No mentors available for **${cat.name}**. Try another.`,
-//           );
-//           setFlowStep("mentor-topics");
-//         }
-//       } catch (err) {
-//         setIsTyping(false);
-//         pushMessage(
-//           "bot",
-//           "Something went wrong connecting you to a mentor. Please try again.",
-//         );
-//       } finally {
-//         setConnectingCategoryId(null);
-//       }
-//     },
-//     [
-//       connectingCategoryId,
-//       savedContact,
-//       mentorForm,
-//       pushMessage,
-//       createConversation,
-//       getExpertsByCategory,
-//       getExpertsByCategoryId,
-//     ],
-//   );
-
-//   const handleSubmitQuery = useCallback(
-//     (e?: FormEvent) => {
-//       e?.preventDefault();
-//       if (validateQueryForm()) {
-//         setQuerySubmitTrigger((n) => n + 1);
-//       }
-//     },
-//     [validateQueryForm],
-//   );
-
-//   const handleSend = useCallback(
-//     (e?: FormEvent) => {
-//       e?.preventDefault();
-//       if (flowStep === "mentor-form") handleMentorFormSubmit();
-//     },
-//     [flowStep, handleMentorFormSubmit],
-//   );
-
-//   const handleLiveChatSend = useCallback(
-//     (e?: FormEvent) => {
-//       e?.preventDefault();
-//       const message = chatbotQuestion.question?.trim();
-//       if (!message || !isValidChatMessage(message)) return;
-//       setLocalValidationErrors({});
-//       askQuestion();
-//     },
-//     [chatbotQuestion, askQuestion],
-//   );
-
-//   const handleMentorChatSend = useCallback(
-//     (e?: FormEvent) => {
-//       e?.preventDefault();
-//       if (
-//         !mentorMessage.message?.trim() ||
-//         !isValidChatMessage(mentorMessage.message) ||
-//         !selectedConversation?.conversation_generated_id ||
-//         selectedConversation.status === "CLOSED"
-//       )
-//         return;
-//       setLocalValidationErrors({});
-//       sendMentorMessage();
-//     },
-//     [mentorMessage, selectedConversation, sendMentorMessage],
-//   );
-
-//   const headerTitle =
-//     flowStep === "faq-list"
-//       ? "SupportBot"
-//       : flowStep === "faq-categories"
-//         ? (selectedFAQ?.faq_default_question ?? "Categories")
-//         : flowStep === "faq-questions"
-//           ? (selectedCategory?.topic_name ?? "Questions")
-//           : flowStep === "mentor-form"
-//             ? "Contact Support"
-//             : flowStep === "query-form"
-//               ? "Raise a Query"
-//               : flowStep === "live-chat"
-//                 ? "Live Chat"
-//                 : flowStep === "mentor-topics"
-//                   ? "Talk to a Mentor"
-//                   : flowStep === "post-chat-options"
-//                     ? "More Questions?"
-//                     : flowStep === "mentor-chat"
-//                       ? (autoSelectedExpert?.name ??
-//                         selectedConversation?.category_name ??
-//                         "Mentor Chat")
-//                       : "Next Steps";
-//   const displayContact = savedContact ?? mentorForm;
-
-//   const renderContent = () => {
-//     if (flowStep === "faq-list")
-//       return (
-//         <div className="cw-faqlist-wrap">
-//           <div className="cw-section-title">
-//             <span className="cw-section-icon">
-//               <MessageSquare size={15} />
-//             </span>
-//             Pick a question to get started
-//           </div>
-//           {faqsLoading && (
-//             <div className="cw-skeleton-list">
-//               {[0, 1, 2].map((i) => (
-//                 <div key={i} className="cw-skeleton-row" />
-//               ))}
-//             </div>
-//           )}
-//           {!faqsLoading && faqs.length === 0 && (
-//             <div className="cw-empty-state">No FAQs available yet.</div>
-//           )}
-//           {!faqsLoading && faqs.length > 0 && (
-//             <div className="cw-faqlist-items">
-//               {faqs
-//                 .filter((f) => f.isActiveFAQ)
-//                 .map((faq, i) => (
-//                   <button
-//                     key={faq.faq_generated_id || i}
-//                     className="cw-faqlist-item"
-//                     style={{ animationDelay: `${i * 0.05}s` }}
-//                     onClick={() => handleFaqSelect(faq)}
-//                     type="button"
-//                   >
-//                     <MessageSquare size={14} />
-//                     <span>{faq.faq_default_question}</span>
-//                   </button>
-//                 ))}
-//             </div>
-//           )}
-//           <button
-//             className="cw-help-btn"
-//             onClick={handleShowSatisfaction}
-//             type="button"
-//           >
-//             <HelpCircle size={16} className="cw-help-btn-icon" />
-//             <span className="cw-help-btn-text">
-//               <span>Can&apos;t find your answer?</span>
-//               <span className="cw-help-btn-sub">Talk to our support team</span>
-//             </span>
-//           </button>
-//         </div>
-//       );
-//     if (flowStep === "faq-categories" && selectedFAQ) {
-//       const cats = selectedFAQ.categories || [];
-//       return (
-//         <div className="cw-faqlist-wrap">
-//           <div className="cw-section-title">
-//             <span className="cw-section-icon">
-//               <Folder size={15} />
-//             </span>
-//             Categories
-//           </div>
-//           {cats.length === 0 ? (
-//             <div className="cw-empty-state">No categories yet.</div>
-//           ) : (
-//             <div className="cw-faqlist-items">
-//               {cats.map((cat, i) => (
-//                 <button
-//                   key={cat.category_generated_id || i}
-//                   className="cw-faqlist-item"
-//                   style={{ animationDelay: `${i * 0.05}s` }}
-//                   onClick={() => handleCategorySelect(cat)}
-//                   type="button"
-//                 >
-//                   <Folder size={14} />
-//                   <span>{cat.topic_name || "Unknown"}</span>
-//                 </button>
-//               ))}
-//             </div>
-//           )}
-//           <button
-//             className="cw-help-btn"
-//             onClick={handleShowSatisfaction}
-//             type="button"
-//           >
-//             <MessageSquareWarning size={16} className="cw-help-btn-icon" />
-//             <span className="cw-help-btn-text">
-//               <span>Need more help?</span>
-//               <span className="cw-help-btn-sub">Contact our support team</span>
-//             </span>
-//           </button>
-//         </div>
-//       );
-//     }
-//     if (flowStep === "faq-questions" && selectedCategory) {
-//       const questions = selectedCategory.questions || [];
-//       return (
-//         <div className="cw-faqlist-wrap">
-//           <div className="cw-section-title">
-//             <span className="cw-section-icon">
-//               <FileText size={15} />
-//             </span>
-//             {selectedCategory.topic_name || "Questions"}
-//           </div>
-//           {questions.length === 0 ? (
-//             <div className="cw-empty-state">No questions yet.</div>
-//           ) : (
-//             <div className="cw-faqlist-items">
-//               {questions.map((q, i) => (
-//                 <button
-//                   key={q.question_generated_id || i}
-//                   className={`cw-faqlist-item ${selectedQuestion?.question_generated_id === q.question_generated_id ? "cw-faqlist-item--active" : ""}`}
-//                   style={{ animationDelay: `${i * 0.05}s` }}
-//                   onClick={() => handleQuestionSelect(q)}
-//                   type="button"
-//                 >
-//                   <FileText size={14} />
-//                   <span>{q.question_text}</span>
-//                 </button>
-//               ))}
-//             </div>
-//           )}
-//           {selectedQuestion && (
-//             <div className="cw-answer-box">
-//               <div className="cw-answer-box-header">
-//                 <MessageSquare size={14} />
-//                 <span>{selectedQuestion.question_text}</span>
-//               </div>
-//               {(selectedQuestion.answers || []).length > 0 ? (
-//                 <div className="cw-answer-list">
-//                   {(selectedQuestion.answers || []).map((a, i) => (
-//                     <p key={i} className="cw-answer-item">
-//                       {a.answer_text}
-//                     </p>
-//                   ))}
-//                 </div>
-//               ) : (
-//                 <p className="cw-answer-empty">No answer available yet.</p>
-//               )}
-//             </div>
-//           )}
-//           <button
-//             className="cw-help-btn"
-//             onClick={handleShowSatisfaction}
-//             type="button"
-//           >
-//             <MessageSquareWarning size={16} className="cw-help-btn-icon" />
-//             <span className="cw-help-btn-text">
-//               <span>Need more help?</span>
-//               <span className="cw-help-btn-sub">Contact our support team</span>
-//             </span>
-//           </button>
-//         </div>
-//       );
-//     }
-//     if (flowStep === "mentor-form") {
-//       const ci = MENTOR_STEPS.findIndex((s) => s.key === mentorFormStep);
-//       return (
-//         <div className="cw-progress-card">
-//           {MENTOR_STEPS.map((s, i) => (
-//             <div
-//               key={s.key}
-//               className={`cw-progress-step ${i < ci ? "is-done" : ""} ${i === ci ? "is-active" : ""}`}
-//             >
-//               <span className="cw-progress-dot">
-//                 {i < ci ? <Check size={12} /> : s.icon}
-//               </span>
-//               <span className="cw-progress-label">{s.label}</span>
-//               {i < MENTOR_STEPS.length - 1 && (
-//                 <span className="cw-progress-line" />
-//               )}
-//             </div>
-//           ))}
-//           {isSavingContact && (
-//             <div className="cw-saving-indicator">
-//               <Loader2 size={12} className="cw-spin" />
-//               Saving...
-//             </div>
-//           )}
-//         </div>
-//       );
-//     }
-//     if (flowStep === "mentor-options")
-//       return (
-//         <div className="cw-options-wrap">
-//           <div className="cw-contact-summary">
-//             <div className="cw-contact-row">
-//               <User size={13} />
-//               <span>{displayContact.name}</span>
-//             </div>
-//             <div className="cw-contact-row">
-//               <Phone size={13} />
-//               <span>{displayContact.mobile}</span>
-//             </div>
-//             <div className="cw-contact-row">
-//               <Mail size={13} />
-//               <span>{displayContact.email}</span>
-//             </div>
-//             <button
-//               className="cw-edit-contact-link"
-//               onClick={handleEditContact}
-//               type="button"
-//             >
-//               <Pencil size={11} />
-//               Not you? Update details
-//             </button>
-//           </div>
-//           <button
-//             className="cw-option-btn cw-option-chat"
-//             onClick={handleChatWithBot}
-//             type="button"
-//           >
-//             <div className="cw-option-icon">
-//               <Bot size={20} />
-//             </div>
-//             <div className="cw-option-text">
-//               <span className="cw-option-label">Chat with Bot</span>
-//               <span className="cw-option-desc">
-//                 Get instant answers from SupportBot AI
-//               </span>
-//             </div>
-//           </button>
-//           <button
-//             className="cw-option-btn cw-option-mentor"
-//             onClick={handleShowMentorTopics}
-//             type="button"
-//           >
-//             <div className="cw-option-icon">
-//               <Users size={20} />
-//             </div>
-//             <div className="cw-option-text">
-//               <span className="cw-option-label">Talk to a Mentor</span>
-//               <span className="cw-option-desc">
-//                 Get connected live with a topic expert
-//               </span>
-//             </div>
-//           </button>
-//           <button
-//             className="cw-option-btn cw-option-query"
-//             onClick={handleStartQueryForm}
-//             type="button"
-//           >
-//             <div className="cw-option-icon">
-//               <FileText size={20} />
-//             </div>
-//             <div className="cw-option-text">
-//               <span className="cw-option-label">Raise a Query</span>
-//               <span className="cw-option-desc">
-//                 Log a ticket for our team to track
-//               </span>
-//             </div>
-//           </button>
-//         </div>
-//       );
-//     if (flowStep === "post-chat-options")
-//       return (
-//         <div className="cw-options-wrap">
-//           <div className="cw-section-title">What would you like to do?</div>
-//           <button
-//             className="cw-option-btn cw-option-chat"
-//             onClick={handleChatWithBot}
-//             type="button"
-//           >
-//             <div className="cw-option-icon">
-//               <Bot size={20} />
-//             </div>
-//             <div className="cw-option-text">
-//               <span className="cw-option-label">Chat with Bot</span>
-//               <span className="cw-option-desc">
-//                 Get instant answers from SupportBot AI
-//               </span>
-//             </div>
-//           </button>
-//           <button
-//             className="cw-option-btn cw-option-query"
-//             onClick={handleStartQueryForm}
-//             type="button"
-//           >
-//             <div className="cw-option-icon">
-//               <FileText size={20} />
-//             </div>
-//             <div className="cw-option-text">
-//               <span className="cw-option-label">Raise a Query</span>
-//               <span className="cw-option-desc">
-//                 Not satisfied? Log a ticket for our team
-//               </span>
-//             </div>
-//           </button>
-//         </div>
-//       );
-//     if (flowStep === "query-form")
-//       return (
-//         <div className="cw-query-form-wrap">
-//           <div className="cw-contact-summary cw-contact-summary--compact">
-//             <div className="cw-contact-row">
-//               <User size={13} />
-//               <span>{displayContact.name}</span>
-//             </div>
-//             <div className="cw-contact-row">
-//               <Mail size={13} />
-//               <span>{displayContact.email}</span>
-//             </div>
-//           </div>
-//           <form className="cw-query-form" onSubmit={handleSubmitQuery}>
-//             <div className="cw-query-field">
-//               <label className="cw-query-label">
-//                 <ClipboardList size={13} />
-//                 Query title
-//               </label>
-//               <input
-//                 className={`cw-query-input ${requestQueryErrors.query_title || localValidationErrors.query_title ? "has-error" : ""}`}
-//                 name="query_title"
-//                 placeholder="e.g. Unable to submit assignment"
-//                 value={requestQuery.query_title}
-//                 onChange={(e) => {
-//                   handleRequestQueryChange(e);
-//                   // Real-time validation
-//                   if (
-//                     e.target.value.trim().length > 0 &&
-//                     e.target.value.trim().length < 5
-//                   ) {
-//                     setLocalValidationErrors((prev) => ({
-//                       ...prev,
-//                       query_title:
-//                         "Please enter a query title (minimum 5 characters).",
-//                     }));
-//                   } else {
-//                     setLocalValidationErrors((prev) => {
-//                       const { query_title, ...rest } = prev;
-//                       return rest;
-//                     });
-//                   }
-//                 }}
-//                 disabled={requestQueryLoading}
-//                 maxLength={100}
-//                 autoFocus
-//               />
-//               {(requestQueryErrors.query_title ||
-//                 localValidationErrors.query_title) && (
-//                 <span className="cw-query-error">
-//                   {localValidationErrors.query_title ||
-//                     requestQueryErrors.query_title}
-//                 </span>
-//               )}
-//             </div>
-//             <div className="cw-query-field">
-//               <label className="cw-query-label">
-//                 <FileText size={13} />
-//                 Describe the issue
-//               </label>
-//               <textarea
-//                 className={`cw-query-textarea ${requestQueryErrors.query_description || localValidationErrors.query_description ? "has-error" : ""}`}
-//                 name="query_description"
-//                 placeholder="Tell us what happened..."
-//                 value={requestQuery.query_description}
-//                 onChange={(e) => {
-//                   handleRequestQueryChange(e);
-//                   // Real-time validation
-//                   if (
-//                     e.target.value.trim().length > 0 &&
-//                     e.target.value.trim().length < 10
-//                   ) {
-//                     setLocalValidationErrors((prev) => ({
-//                       ...prev,
-//                       query_description:
-//                         "Please describe your issue in at least 10 characters.",
-//                     }));
-//                   } else {
-//                     setLocalValidationErrors((prev) => {
-//                       const { query_description, ...rest } = prev;
-//                       return rest;
-//                     });
-//                   }
-//                 }}
-//                 disabled={requestQueryLoading}
-//                 maxLength={1000}
-//                 rows={4}
-//               />
-//               {(requestQueryErrors.query_description ||
-//                 localValidationErrors.query_description) && (
-//                 <span className="cw-query-error">
-//                   {localValidationErrors.query_description ||
-//                     requestQueryErrors.query_description}
-//                 </span>
-//               )}
-//             </div>
-//             <button
-//               type="submit"
-//               className="cw-query-submit-btn"
-//               disabled={
-//                 requestQueryLoading ||
-//                 !isValidQueryTitle(requestQuery.query_title) ||
-//                 !isValidQueryDescription(requestQuery.query_description)
-//               }
-//             >
-//               {requestQueryLoading ? (
-//                 <>
-//                   <Loader2 size={15} className="cw-spin" />
-//                   Submitting...
-//                 </>
-//               ) : (
-//                 <>
-//                   <Send size={15} />
-//                   Submit Query
-//                 </>
-//               )}
-//             </button>
-//           </form>
-//         </div>
-//       );
-//     if (flowStep === "mentor-topics")
-//       return (
-//         <div className="cw-categories-wrap">
-//           <div className="cw-section-title">
-//             <span className="cw-section-icon">
-//               <Users size={15} />
-//             </span>
-//             Pick a topic for your mentor
-//           </div>
-//           {expertsLoading && (
-//             <div className="cw-skeleton-list">
-//               {[0, 1, 2].map((i) => (
-//                 <div key={i} className="cw-skeleton-card" />
-//               ))}
-//             </div>
-//           )}
-//           {!expertsLoading && expertCategories.length === 0 && (
-//             <div className="cw-empty-state">
-//               No mentor categories available.
-//             </div>
-//           )}
-//           {!expertsLoading && expertCategories.length > 0 && (
-//             <div className="cw-categories-grid">
-//               {expertCategories.map((cat, i) => {
-//                 const catKey = cat.category_generated_id ?? cat.name;
-//                 const isConnectingThis = connectingCategoryId === catKey;
-//                 return (
-//                   <button
-//                     key={cat.category_generated_id ?? i}
-//                     className={`cw-category-card ${isConnectingThis ? "is-connecting" : ""}`}
-//                     style={{ animationDelay: `${i * 0.06}s` }}
-//                     onClick={() => handleMentorCategorySelect(cat)}
-//                     type="button"
-//                     disabled={connectingCategoryId !== null}
-//                   >
-//                     <span className="cw-category-icon">
-//                       {isConnectingThis ? (
-//                         <Loader2 size={18} className="cw-spin" />
-//                       ) : (
-//                         <Users size={18} />
-//                       )}
-//                     </span>
-//                     <span className="cw-category-name">
-//                       {cat.name}
-//                       {isConnectingThis && (
-//                         <span className="cw-category-status">
-//                           Connecting...
-//                         </span>
-//                       )}
-//                     </span>
-//                   </button>
-//                 );
-//               })}
-//             </div>
-//           )}
-//         </div>
-//       );
-//     return null;
-//   };
-
-//   const showFooterInput =
-//     flowStep === "mentor-form" ||
-//     flowStep === "live-chat" ||
-//     flowStep === "mentor-chat";
-
-//   return (
-//     <div className="cw-root">
-//       {isOpen && (
-//         <div className="cw-panel" role="dialog" aria-label="SupportBot">
-//           <div className="cw-header">
-//             {flowStep !== "faq-list" && (
-//               <button
-//                 className="cw-header-back-btn"
-//                 onClick={handleBack}
-//                 type="button"
-//               >
-//                 <ArrowLeft size={18} />
-//               </button>
-//             )}
-//             <div className="cw-header-icon">
-//               <Sparkles size={18} />
-//             </div>
-//             <div className="cw-header-meta">
-//               <div className="cw-header-title">{headerTitle}</div>
-//               <div className="cw-header-status">
-//                 <span
-//                   className={`cw-status-dot ${flowStep === "mentor-chat" ? (selectedConversation?.status === "ACTIVE" ? "" : selectedConversation?.status === "CLOSED" ? "cw-status-dot--closed" : "cw-status-dot--waiting") : ""}`}
-//                 />
-//                 <span>
-//                   {flowStep === "mentor-chat"
-//                     ? selectedConversation?.status === "ACTIVE"
-//                       ? "Mentor connected"
-//                       : selectedConversation?.status === "CLOSED"
-//                         ? "Closed"
-//                         : "Waiting"
-//                     : "Online"}
-//                 </span>
-//               </div>
-//             </div>
-//             <button
-//               className="cw-close-btn"
-//               onClick={() => setIsOpen(false)}
-//               type="button"
-//             >
-//               <X size={16} />
-//             </button>
-//           </div>
-//           <div className="cw-messages" aria-live="polite">
-//             {messages.map((m) => (
-//               <div
-//                 key={m.id}
-//                 className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
-//               >
-//                 <div
-//                   className={`cw-avatar ${m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"}`}
-//                 >
-//                   {m.sender === "bot" ? <Bot size={13} /> : <User size={12} />}
-//                 </div>
-//                 <div
-//                   className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"}`}
-//                 >
-//                   {m.sender === "bot" ? (
-//                     <ReactMarkdown
-//                       remarkPlugins={[remarkGfm]}
-//                       rehypePlugins={[rehypeHighlight]}
-//                     >
-//                       {m.text}
-//                     </ReactMarkdown>
-//                   ) : (
-//                     m.text
-//                   )}
-//                 </div>
-//               </div>
-//             ))}
-//             {flowStep === "live-chat" &&
-//               chatbotMessages.map((cm, i) => (
-//                 <div
-//                   key={`chat-${i}`}
-//                   className={`cw-msg ${cm.role === "user" ? "cw-msg--user" : ""}`}
-//                 >
-//                   <div
-//                     className={`cw-avatar ${cm.role === "assistant" ? "cw-avatar--bot" : "cw-avatar--user"}`}
-//                   >
-//                     {cm.role === "assistant" ? (
-//                       <Bot size={13} />
-//                     ) : (
-//                       <User size={12} />
-//                     )}
-//                   </div>
-//                   <div
-//                     className={`cw-bubble ${cm.role === "assistant" ? "cw-bubble--bot" : "cw-bubble--user"}`}
-//                   >
-//                     {cm.role === "assistant" ? (
-//                       <ReactMarkdown
-//                         remarkPlugins={[remarkGfm]}
-//                         rehypePlugins={[rehypeHighlight]}
-//                       >
-//                         {cm.content}
-//                       </ReactMarkdown>
-//                     ) : (
-//                       cm.content
-//                     )}
-//                   </div>
-//                 </div>
-//               ))}
-//             {flowStep === "mentor-chat" && (
-//               <>
-//                 {conversationEnded && (
-//                   <div className="cw-conversation-ended">
-//                     <Clock size={14} /> This conversation has ended
-//                   </div>
-//                 )}
-//                 {mentorMessages
-//                   .filter(
-//                     (mm, idx, self) =>
-//                       idx ===
-//                       self.findIndex(
-//                         (m) =>
-//                           m.message_generated_id === mm.message_generated_id,
-//                       ),
-//                   )
-//                   .map((mm, i) => {
-//                     const iv = mm.sender === "VISITOR";
-//                     const lastIdx =
-//                       mentorMessages.filter(
-//                         (mm2, idx2, self2) =>
-//                           idx2 ===
-//                           self2.findIndex(
-//                             (m) =>
-//                               m.message_generated_id ===
-//                               mm2.message_generated_id,
-//                           ),
-//                       ).length - 1;
-//                     const isLastVisitorMsg = iv && i === lastIdx;
-//                     return (
-//                       <div
-//                         key={
-//                           mm.message_generated_id
-//                             ? `${mm.message_generated_id}-${i}`
-//                             : `m-${i}`
-//                         }
-//                         className={`cw-msg ${iv ? "cw-msg--user" : ""}`}
-//                       >
-//                         <div
-//                           className={`cw-avatar ${iv ? "cw-avatar--user" : "cw-avatar--bot"}`}
-//                         >
-//                           {iv ? <User size={12} /> : <Users size={13} />}
-//                         </div>
-//                         <div
-//                           className={`cw-bubble ${iv ? "cw-bubble--user" : "cw-bubble--bot"}`}
-//                         >
-//                           {mm.message}
-//                           {iv && isLastVisitorMsg && (
-//                             <div className="cw-message-status">
-//                               {mm.is_read ? (
-//                                 <CheckCheck
-//                                   size={12}
-//                                   className="cw-status-read"
-//                                 />
-//                               ) : (
-//                                 <Clock
-//                                   size={12}
-//                                   className="cw-status-pending"
-//                                 />
-//                               )}
-//                             </div>
-//                           )}
-//                         </div>
-//                       </div>
-//                     );
-//                   })}
-//                 {conversationEnded && satisfactionStage === "ask" && (
-//                   <div className="cw-post-chat-actions">
-//                     <p className="cw-post-chat-text">
-//                       Was this conversation helpful? Let us know, or raise a
-//                       query if something&apos;s still unresolved.
-//                     </p>
-//                     <div className="cw-post-chat-buttons">
-//                       <button
-//                         className="cw-btn cw-btn--query"
-//                         onClick={handleRaiseQueryFromEnd}
-//                         type="button"
-//                       >
-//                         <FileText size={14} />
-//                         Raise a Query
-//                       </button>
-//                       <button
-//                         className="cw-btn cw-btn--satisfied"
-//                         onClick={handleConversationSatisfied}
-//                         type="button"
-//                       >
-//                         <Check size={14} />
-//                         All Good, Thanks
-//                       </button>
-//                     </div>
-//                   </div>
-//                 )}
-//                 {conversationEnded && satisfactionStage === "closed" && (
-//                   <div className="cw-post-chat-actions cw-post-chat-actions--closed">
-//                     <div className="cw-post-chat-icon">
-//                       <PartyPopper size={20} />
-//                     </div>
-//                     <p className="cw-post-chat-text">
-//                       Thanks for chatting with us today!
-//                     </p>
-//                     <div className="cw-post-chat-buttons">
-//                       <button
-//                         className="cw-btn cw-btn--home"
-//                         onClick={handleBackToHome}
-//                         type="button"
-//                       >
-//                         <Home size={14} />
-//                         Back to Home
-//                       </button>
-//                       <button
-//                         className="cw-btn cw-btn--exit"
-//                         onClick={handleExitChat}
-//                         type="button"
-//                       >
-//                         <DoorOpen size={14} />
-//                         Exit Chat
-//                       </button>
-//                     </div>
-//                   </div>
-//                 )}
-//               </>
-//             )}
-//             {renderContent()}
-//             {(isTyping ||
-//               (flowStep === "live-chat" && chatbotLoading) ||
-//               (flowStep === "mentor-topics" && expertsLoading)) && (
-//               <div className="cw-msg">
-//                 <div className="cw-avatar cw-avatar--bot">
-//                   <Bot size={13} />
-//                 </div>
-//                 <div className="cw-typing">
-//                   <span />
-//                   <span />
-//                   <span />
-//                 </div>
-//               </div>
-//             )}
-//             <div ref={messagesEndRef} />
-//           </div>
-//           {showFooterInput && flowStep === "mentor-form" && (
-//             <div className="cw-input-area">
-//               {formError && <div className="cw-form-error">{formError}</div>}
-//               {localValidationErrors[mentorFormStep] && !formError && (
-//                 <div className="cw-form-error">
-//                   {localValidationErrors[mentorFormStep]}
-//                 </div>
-//               )}
-//               <form className="cw-input-row" onSubmit={handleSend}>
-//                 <input
-//                   className={`cw-input ${formError || localValidationErrors[mentorFormStep] ? "has-error" : ""}`}
-//                   placeholder={
-//                     mentorFormStep === "name"
-//                       ? "Full name..."
-//                       : mentorFormStep === "mobile"
-//                         ? "Mobile number..."
-//                         : "Email address..."
-//                   }
-//                   value={draft}
-//                   onChange={
-//                     mentorFormStep === "name"
-//                       ? handleNameInput
-//                       : mentorFormStep === "mobile"
-//                         ? handleMobileInput
-//                         : handleEmailInput
-//                   }
-//                   type={
-//                     mentorFormStep === "email"
-//                       ? "email"
-//                       : mentorFormStep === "mobile"
-//                         ? "tel"
-//                         : "text"
-//                   }
-//                   disabled={isSavingContact}
-//                   autoFocus
-//                   maxLength={
-//                     mentorFormStep === "mobile"
-//                       ? 15
-//                       : mentorFormStep === "name"
-//                         ? 100
-//                         : 255
-//                   }
-//                 />
-//                 <button
-//                   type="submit"
-//                   className="cw-send-btn"
-//                   disabled={!draft.trim() || isSavingContact}
-//                 >
-//                   {isSavingContact ? (
-//                     <Loader2 size={16} className="cw-spin" />
-//                   ) : (
-//                     <Send size={16} />
-//                   )}
-//                 </button>
-//               </form>
-//             </div>
-//           )}
-//           {showFooterInput && flowStep === "live-chat" && (
-//             <div className="cw-input-area">
-//               {(chatbotErrors.question || localValidationErrors.message) && (
-//                 <div className="cw-form-error">
-//                   {localValidationErrors.message || chatbotErrors.question}
-//                 </div>
-//               )}
-//               <form className="cw-input-row" onSubmit={handleLiveChatSend}>
-//                 <input
-//                   className={`cw-input ${chatbotErrors.question || localValidationErrors.message ? "has-error" : ""}`}
-//                   placeholder="Ask SupportBot..."
-//                   value={chatbotQuestion.question ?? ""}
-//                   onChange={handleChatMessageInput}
-//                   name="question"
-//                   maxLength={1000}
-//                   autoFocus
-//                 />
-//                 <button
-//                   type="submit"
-//                   className="cw-send-btn"
-//                   disabled={
-//                     !isValidChatMessage(chatbotQuestion.question || "") ||
-//                     chatbotLoading
-//                   }
-//                 >
-//                   {chatbotLoading ? (
-//                     <Loader2 size={16} className="cw-spin" />
-//                   ) : (
-//                     <Send size={16} />
-//                   )}
-//                 </button>
-//               </form>
-//             </div>
-//           )}
-//           {showFooterInput &&
-//             flowStep === "mentor-chat" &&
-//             !conversationEnded && (
-//               <div className="cw-input-area">
-//                 {(mentorErrors.message || localValidationErrors.message) && (
-//                   <div className="cw-form-error">
-//                     {localValidationErrors.message || mentorErrors.message}
-//                   </div>
-//                 )}
-//                 <form className="cw-input-row" onSubmit={handleMentorChatSend}>
-//                   <input
-//                     className={`cw-input ${mentorErrors.message || localValidationErrors.message ? "has-error" : ""}`}
-//                     placeholder={
-//                       selectedConversation?.status === "CLOSED"
-//                         ? "Conversation ended"
-//                         : "Type your message..."
-//                     }
-//                     value={mentorMessage.message ?? ""}
-//                     onChange={handleMentorMessageInput}
-//                     name="message"
-//                     maxLength={1000}
-//                     disabled={selectedConversation?.status === "CLOSED"}
-//                     autoFocus
-//                   />
-//                   <button
-//                     type="submit"
-//                     className="cw-send-btn"
-//                     disabled={
-//                       !isValidChatMessage(mentorMessage.message || "") ||
-//                       selectedConversation?.status === "CLOSED"
-//                     }
-//                   >
-//                     <Send size={16} />
-//                   </button>
-//                 </form>
-//               </div>
-//             )}
-//           <div className="cw-footer-tag">Powered by SupportBot</div>
-//         </div>
-//       )}
-//       {!isOpen && (
-//         <button
-//           className="cw-launcher"
-//           onClick={() => setIsOpen(true)}
-//           type="button"
-//         >
-//           <MessageCircle size={24} />
-//           <span className="cw-launcher-dot" />
-//         </button>
-//       )}
-//     </div>
-//   );
-// }
-
-// export default function ChatWidget() {
-//   return (
-//     <FAQProvider>
-//       <ChatbotProvider>
-//         <WebsiteUserProvider>
-//           <RequestQueryProvider>
-//             <UserProvider>
-//               <ChatProvider>
-//                 <ChatWidgetInner />
-//               </ChatProvider>
-//             </UserProvider>
-//           </RequestQueryProvider>
-//         </WebsiteUserProvider>
-//       </ChatbotProvider>
-//     </FAQProvider>
-//   );
-// }
 /* eslint-disable react-hooks/immutability */
 /* eslint-disable react-hooks/preserve-manual-memoization */
 /* eslint-disable react-hooks/set-state-in-effect */
@@ -2045,6 +38,8 @@ import {
   PartyPopper,
   DoorOpen,
   Home,
+  Globe,
+  ChevronDown,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -2085,18 +80,6 @@ interface Message {
   text: string;
 }
 
-// NOTE ON FLOW CHANGES
-// ---------------------------------------------------------------------------
-// - "mentor-options" is the single hub. Every "what next" decision routes
-//   through it instead of silently jumping the user into an old conversation.
-// - "mentor-resume-choice" is shown ONLY when the user explicitly taps
-//   "Talk to a Mentor" while an active conversation already exists — they
-//   choose to resume or start fresh. Nothing auto-navigates them there.
-// - "query-category" is a new step: raising a query now asks which topic it
-//   belongs to (same category list used for mentors), then goes to the
-//   title/description form. The chosen category is written into
-//   requestQuery.category (the new API field).
-// - "post-chat-options" is removed; the hub covers that job now.
 type FlowStep =
   | "faq-list"
   | "faq-categories"
@@ -2131,14 +114,876 @@ interface ValidationErrors {
   message?: string;
 }
 
+// ========== LANGUAGE SUPPORT ==========
+
+const LANGUAGE_STORAGE_KEY = "nimobot_selected_language";
+
+const LANGUAGES = [
+  { code: "en", label: "English", native: "English" },
+  { code: "hi", label: "Hindi", native: "हिन्दी" },
+  { code: "te", label: "Telugu", native: "తెలుగు" },
+  { code: "ta", label: "Tamil", native: "தமிழ்" },
+  { code: "kn", label: "Kannada", native: "ಕನ್ನಡ" },
+];
+
+type SupportedLanguage = "en" | "hi" | "te" | "ta" | "kn";
+
+interface Translations {
+  // Welcome
+  welcomeMessage: string;
+
+  // Language selector
+  chooseLanguage: string;
+  selectYourLanguage: string;
+  choosePreferredLanguage: string;
+  changeLanguageLabel: string;
+  // FAQ
+  pickQuestion: string;
+  categories: string;
+  noCategoriesYet: string;
+  hereAreCategories: string;
+  questions: string;
+  noQuestionsYet: string;
+  hereAreQuestions: string;
+  noAnswerYet: string;
+  cantFindAnswer: string;
+  talkToSupportTeam: string;
+  needMoreHelp: string;
+
+  // Back navigation
+  back: string;
+  hereAreFAQAgain: string;
+  hereAreCategoriesAgain: string;
+  howToProceed: string;
+  whichCategory: string;
+
+  // Mentor form
+  contactSupport: string;
+  name: string;
+  mobile: string;
+  email: string;
+  fullNamePlaceholder: string;
+  mobilePlaceholder: string;
+  emailPlaceholder: string;
+  niceToMeet: (name: string) => string;
+  mobileNumber: string;
+  emailAddress: string;
+  saving: string;
+  saveError: string;
+  saveErrorRetry: string;
+  thanksSaved: (name: string) => string;
+  invalidName: string;
+  invalidMobile: string;
+  invalidEmail: string;
+
+  // Mentor options
+  howCanWeHelp: string;
+  welcomeBack: (name: string) => string;
+  notYou: string;
+  chatWithBot: string;
+  chatWithBotDesc: string;
+  talkToMentor: string;
+  talkToMentorDesc: string;
+  raiseQuery: string;
+  raiseQueryDesc: string;
+  endChat: string;
+  endChatDesc: string;
+  youAreNowChatting: (name: string) => string;
+
+  // Mentor topics
+  pickTopic: string;
+  noMentorCategories: string;
+  couldntLoadTopics: string;
+  connecting: string;
+  connectingYouWith: (expert: string, category: string) => string;
+  nowTalkingTo: (expert: string) => string;
+  couldntStartConversation: (expert: string) => string;
+  noMentorsAvailable: (category: string) => string;
+  connectionError: string;
+
+  // Resume conversation
+  resumeConversation: string;
+  resumeConversationDesc: (name: string) => string;
+  startNewTopic: string;
+  startNewTopicDesc: string;
+  youHaveActiveConversation: string;
+  aboutTopic: (topic: string) => string;
+  tapToResume: string;
+  resumingConversation: string;
+  activeConversationPrompt: string;
+
+  // Query
+  raiseAQuery: string;
+  whichCategoryQuery: string;
+  gotItTitleDetails: string;
+  giveMeTitleDetails: string;
+  notSureSkip: string;
+  noProblemTitleDetails: string;
+  skipCategory: string;
+  queryTitle: string;
+  describeIssue: string;
+  queryTitlePlaceholder: string;
+  describeIssuePlaceholder: string;
+  submitQuery: string;
+  submitting: string;
+  queryRegistered: string;
+  querySubmitError: string;
+  querySubmitErrorRetry: string;
+  selectCategoryError: string;
+  queryTitleError: string;
+  queryDescriptionError: string;
+  change: string;
+
+  // Mentor chat
+  mentorChat: string;
+  conversationEnded: string;
+  wasHelpful: string;
+  allGoodThanks: string;
+  wonderfulThanks: string;
+  thanksForChatting: string;
+  backToHome: string;
+  exitChat: string;
+  endChatConfirm: string;
+  haveGreatDay: string;
+  typeMessage: string;
+  conversationEndedPlaceholder: string;
+
+  // Status
+  mentorConnected: string;
+  closed: string;
+  waiting: string;
+  nimoBotOnline: string;
+  switch_: string;
+  sureHowToProceed: string;
+
+  // Chat with bot
+  askNimoBot: string;
+  iNeedMoreHelp: string;
+  raiseQueryEnd: string;
+
+  // Misc
+  poweredBy: string;
+  unknown: string;
+  resumeChatting: string;
+  continueChatting: (name: string) => string;
+  differentTopic: string;
+  talkDifferentMentor: string;
+  ongoingConversation: string;
+}
+
+const translations: Record<SupportedLanguage, Translations> = {
+  en: {
+    welcomeMessage:
+      "Hi there! I'm **Nimo Bot**, your AI Assistant. Pick a question below and I'll help you.",
+    chooseLanguage: "Choose Language",
+    selectYourLanguage: "Select Your Language",
+    choosePreferredLanguage: "Choose your preferred language to continue",
+    pickQuestion: "Pick a question to get started",
+    categories: "Categories",
+    noCategoriesYet: "No categories yet.",
+    hereAreCategories: "Here are the categories:",
+    questions: "Questions",
+    noQuestionsYet: "No questions yet.",
+    hereAreQuestions: "Here are the questions:",
+    noAnswerYet: "No answer yet — contact support below.",
+    cantFindAnswer: "Can't find your answer?",
+    talkToSupportTeam: "Talk to our support team",
+    needMoreHelp: "Need more help?",
+    back: "Back",
+    hereAreFAQAgain: "Here are the FAQ questions again:",
+    hereAreCategoriesAgain: "Here are the categories again:",
+    howToProceed: "How would you like to proceed?",
+    whichCategory: "Which category is this about?",
+    contactSupport: "Contact Support",
+    name: "Name",
+    mobile: "Mobile",
+    email: "Email",
+    fullNamePlaceholder: "Full name...",
+    mobilePlaceholder: "Mobile number...",
+    emailPlaceholder: "Email address...",
+    niceToMeet: (name: string) =>
+      `Nice to meet you, **${name}**! Mobile number?`,
+    mobileNumber: "Mobile number?",
+    emailAddress: "Email address?",
+    saving: "Saving...",
+    saveError: "Hmm, I couldn't save your details just now. Please try again.",
+    saveErrorRetry:
+      "Something went wrong saving your details. Please try again.",
+    thanksSaved: (name: string) =>
+      `Thanks, **${name}**! I've saved your details.\n\nHow would you like to proceed?`,
+    invalidName: "Please enter your full name (minimum 3 characters).",
+    invalidMobile: "Please enter a valid mobile number.",
+    invalidEmail: "Please enter a valid email address.",
+    howCanWeHelp: "How can we help?",
+    welcomeBack: (name: string) =>
+      `Welcome back, **${name}**! How would you like to proceed?`,
+    notYou: "Not you? Update details",
+    chatWithBot: "Chat with Nimo Bot",
+    chatWithBotDesc: "Get instant answers from Nimo Bot AI",
+    talkToMentor: "Talk to a Mentor",
+    talkToMentorDesc: "Get connected live with a topic expert",
+    raiseQuery: "Raise a Query",
+    raiseQueryDesc: "Log a ticket for our team to track",
+    endChat: "End Chat",
+    endChatDesc: "Close this conversation for now",
+    youAreNowChatting: (name: string) =>
+      `You're now chatting with Nimo Bot AI, **${name}**. Ask me anything.`,
+    pickTopic: "Pick a topic for your mentor",
+    noMentorCategories: "No mentor categories available right now.",
+    couldntLoadTopics: "Couldn't load mentor topics — please try again.",
+    connecting: "Connecting...",
+    connectingYouWith: (expert: string, category: string) =>
+      `Connecting you with **${expert}**, your mentor for **${category}**...`,
+    nowTalkingTo: (expert: string) =>
+      `You're now talking to **${expert}**. Say hello! 👋`,
+    couldntStartConversation: (expert: string) =>
+      `Couldn't start the conversation with **${expert}** — please try again.`,
+    noMentorsAvailable: (category: string) =>
+      `No mentors available for **${category}**. Try another.`,
+    connectionError:
+      "Something went wrong connecting you to a mentor. Please try again.",
+    resumeConversation: "Resume Conversation",
+    resumeConversationDesc: (name: string) => `Continue chatting with ${name}`,
+    startNewTopic: "Start a New Topic",
+    startNewTopicDesc: "Talk to a different mentor about something else",
+    youHaveActiveConversation: "You have an ongoing conversation",
+    aboutTopic: (topic: string) => `About ${topic} — tap to resume`,
+    tapToResume: "Tap to resume",
+    resumingConversation: "Resuming your conversation...",
+    activeConversationPrompt:
+      "You already have an ongoing conversation. Would you like to resume it or start a new topic?",
+    raiseAQuery: "Raise a Query",
+    whichCategoryQuery: "Which category best describes your query?",
+    gotItTitleDetails: "Got it. Now give me a title and details.",
+    giveMeTitleDetails: "Give me a title and details.",
+    notSureSkip: "Not sure — skip category",
+    noProblemTitleDetails: "No problem. Give me a title and details.",
+    skipCategory: "Skip — I'm not sure which category",
+    queryTitle: "Query title",
+    describeIssue: "Describe the issue",
+    queryTitlePlaceholder: "e.g. Unable to submit assignment",
+    describeIssuePlaceholder: "Tell us what happened...",
+    submitQuery: "Submit Query",
+    submitting: "Submitting...",
+    queryRegistered: "Your query has been registered!",
+    querySubmitError: "I couldn't submit your query — please try again.",
+    querySubmitErrorRetry:
+      "Something went wrong submitting your query. Please try again.",
+    selectCategoryError: "Please select a category for your query.",
+    queryTitleError: "Please enter a query title (minimum 5 characters).",
+    queryDescriptionError:
+      "Please describe your issue in at least 10 characters.",
+    change: "Change",
+    mentorChat: "Mentor Chat",
+    conversationEnded: "This conversation has been ended by the mentor.",
+    wasHelpful:
+      "Was this conversation helpful? Let us know, or raise a query if something's still unresolved.",
+    allGoodThanks: "All Good, Thanks",
+    wonderfulThanks:
+      "Wonderful! Thank you for chatting with Nimo Bot today — it was a pleasure helping you. 🎉",
+    thanksForChatting: "Thanks for chatting with Nimo Bot today!",
+    backToHome: "Back to Home",
+    exitChat: "Exit Chat",
+    endChatConfirm: "End Chat",
+    haveGreatDay:
+      "Thanks for chatting with Nimo Bot today! Have a great day. 👋",
+    typeMessage: "Type your message...",
+    conversationEndedPlaceholder: "Conversation ended",
+    mentorConnected: "Mentor connected",
+    closed: "Closed",
+    waiting: "Waiting",
+    nimoBotOnline: "Nimo Bot Online",
+    switch_: "Switch",
+    sureHowToProceed: "Sure — how would you like to proceed?",
+    askNimoBot: "Ask Nimo Bot...",
+    iNeedMoreHelp: "I need more help",
+    raiseQueryEnd: "Raise a Query",
+    poweredBy: "Powered by Nimo Bot",
+    unknown: "Unknown",
+    resumeChatting: "Resume Chatting",
+    continueChatting: (name: string) => `Continue chatting with ${name}`,
+    differentTopic: "Different Topic",
+    talkDifferentMentor: "Talk to a different mentor about something else",
+    ongoingConversation: "You have an ongoing conversation",
+    changeLanguageLabel: "Change Language",
+  },
+  hi: {
+    welcomeMessage:
+      "नमस्ते! मैं **Nimo Bot** हूं, आपका AI सहायक। नीचे एक प्रश्न चुनें और मैं आपकी मदद करूंगा।",
+    chooseLanguage: "भाषा चुनें",
+    selectYourLanguage: "अपनी भाषा चुनें",
+    choosePreferredLanguage: "जारी रखने के लिए अपनी पसंदीदा भाषा चुनें",
+    pickQuestion: "शुरू करने के लिए एक प्रश्न चुनें",
+    categories: "श्रेणियाँ",
+    noCategoriesYet: "अभी तक कोई श्रेणी नहीं है।",
+    hereAreCategories: "ये रही श्रेणियाँ:",
+    questions: "प्रश्न",
+    noQuestionsYet: "अभी तक कोई प्रश्न नहीं है।",
+    hereAreQuestions: "ये रहे प्रश्न:",
+    noAnswerYet: "अभी तक कोई उत्तर नहीं — नीचे सहायता से संपर्क करें।",
+    cantFindAnswer: "अपना उत्तर नहीं ढूंढ पा रहे?",
+    talkToSupportTeam: "हमारी सहायता टीम से बात करें",
+    needMoreHelp: "और मदद चाहिए?",
+    back: "वापस",
+    hereAreFAQAgain: "ये रहे फिर से FAQ प्रश्न:",
+    hereAreCategoriesAgain: "ये रही फिर से श्रेणियाँ:",
+    howToProceed: "आप कैसे आगे बढ़ना चाहेंगे?",
+    whichCategory: "यह किस श्रेणी के बारे में है?",
+    contactSupport: "सहायता से संपर्क करें",
+    name: "नाम",
+    mobile: "मोबाइल",
+    email: "ईमेल",
+    fullNamePlaceholder: "पूरा नाम...",
+    mobilePlaceholder: "मोबाइल नंबर...",
+    emailPlaceholder: "ईमेल पता...",
+    niceToMeet: (name: string) =>
+      `आपसे मिलकर अच्छा लगा, **${name}**! मोबाइल नंबर?`,
+    mobileNumber: "मोबाइल नंबर?",
+    emailAddress: "ईमेल पता?",
+    saving: "सहेज रहा है...",
+    saveError:
+      "हम्म, मैं अभी आपका विवरण सहेज नहीं पाया। कृपया पुनः प्रयास करें।",
+    saveErrorRetry:
+      "आपका विवरण सहेजने में कुछ गलत हुआ। कृपया पुनः प्रयास करें।",
+    thanksSaved: (name: string) =>
+      `धन्यवाद, **${name}**! मैंने आपका विवरण सहेज लिया है।\n\nआप कैसे आगे बढ़ना चाहेंगे?`,
+    invalidName: "कृपया अपना पूरा नाम दर्ज करें (न्यूनतम 3 अक्षर)।",
+    invalidMobile: "कृपया एक वैध मोबाइल नंबर दर्ज करें।",
+    invalidEmail: "कृपया एक वैध ईमेल पता दर्ज करें।",
+    howCanWeHelp: "हम आपकी कैसे मदद कर सकते हैं?",
+    welcomeBack: (name: string) =>
+      `वापसी पर स्वागत है, **${name}**! आप कैसे आगे बढ़ना चाहेंगे?`,
+    notYou: "आप नहीं हैं? विवरण अपडेट करें",
+    chatWithBot: "Nimo Bot से चैट करें",
+    chatWithBotDesc: "Nimo Bot AI से तुरंत उत्तर प्राप्त करें",
+    talkToMentor: "मेंटर से बात करें",
+    talkToMentorDesc: "किसी विषय विशेषज्ञ से लाइव जुड़ें",
+    raiseQuery: "प्रश्न उठाएं",
+    raiseQueryDesc: "हमारी टीम के लिए टिकट दर्ज करें",
+    endChat: "चैट समाप्त करें",
+    endChatDesc: "अभी के लिए यह बातचीत बंद करें",
+    youAreNowChatting: (name: string) =>
+      `अब आप Nimo Bot AI से चैट कर रहे हैं, **${name}**। कुछ भी पूछें।`,
+    pickTopic: "अपने मेंटर के लिए विषय चुनें",
+    noMentorCategories: "अभी कोई मेंटर श्रेणी उपलब्ध नहीं है।",
+    couldntLoadTopics: "मेंटर विषय लोड नहीं हो सके — कृपया पुनः प्रयास करें।",
+    connecting: "जोड़ रहा है...",
+    connectingYouWith: (expert: string, category: string) =>
+      `आपको **${expert}** से जोड़ रहा है, **${category}** के लिए आपके मेंटर...`,
+    nowTalkingTo: (expert: string) =>
+      `अब आप **${expert}** से बात कर रहे हैं। नमस्ते कहें! 👋`,
+    couldntStartConversation: (expert: string) =>
+      `**${expert}** के साथ बातचीत शुरू नहीं हो सकी — कृपया पुनः प्रयास करें।`,
+    noMentorsAvailable: (category: string) =>
+      `**${category}** के लिए कोई मेंटर उपलब्ध नहीं है। दूसरा प्रयास करें।`,
+    connectionError:
+      "आपको मेंटर से जोड़ने में कुछ गलत हुआ। कृपया पुनः प्रयास करें।",
+    resumeConversation: "बातचीत फिर से शुरू करें",
+    resumeConversationDesc: (name: string) => `${name} के साथ चैट जारी रखें`,
+    startNewTopic: "नया विषय शुरू करें",
+    startNewTopicDesc: "किसी और चीज़ के बारे में दूसरे मेंटर से बात करें",
+    youHaveActiveConversation: "आपकी एक चल रही बातचीत है",
+    aboutTopic: (topic: string) =>
+      `${topic} के बारे में — फिर से शुरू करने के लिए टैप करें`,
+    tapToResume: "फिर से शुरू करने के लिए टैप करें",
+    resumingConversation: "आपकी बातचीत फिर से शुरू हो रही है...",
+    activeConversationPrompt:
+      "आपकी पहले से एक चल रही बातचीत है। क्या आप इसे फिर से शुरू करना चाहेंगे या नया विषय शुरू करना चाहेंगे?",
+    raiseAQuery: "प्रश्न उठाएं",
+    whichCategoryQuery: "आपका प्रश्न किस श्रेणी में सबसे अच्छा बैठता है?",
+    gotItTitleDetails: "समझ गया। अब मुझे शीर्षक और विवरण दें।",
+    giveMeTitleDetails: "मुझे शीर्षक और विवरण दें।",
+    notSureSkip: "निश्चित नहीं — श्रेणी छोड़ें",
+    noProblemTitleDetails: "कोई बात नहीं। मुझे शीर्षक और विवरण दें।",
+    skipCategory: "छोड़ें — मुझे नहीं पता कौन सी श्रेणी",
+    queryTitle: "प्रश्न शीर्षक",
+    describeIssue: "समस्या का वर्णन करें",
+    queryTitlePlaceholder: "जैसे असाइनमेंट जमा करने में असमर्थ",
+    describeIssuePlaceholder: "हमें बताएं क्या हुआ...",
+    submitQuery: "प्रश्न जमा करें",
+    submitting: "जमा हो रहा है...",
+    queryRegistered: "आपका प्रश्न पंजीकृत हो गया है!",
+    querySubmitError:
+      "मैं आपका प्रश्न जमा नहीं कर सका — कृपया पुनः प्रयास करें।",
+    querySubmitErrorRetry:
+      "आपका प्रश्न जमा करने में कुछ गलत हुआ। कृपया पुनः प्रयास करें।",
+    selectCategoryError: "कृपया अपने प्रश्न के लिए एक श्रेणी चुनें।",
+    queryTitleError: "कृपया प्रश्न शीर्षक दर्ज करें (न्यूनतम 5 अक्षर)।",
+    queryDescriptionError:
+      "कृपया अपनी समस्या का वर्णन कम से कम 10 अक्षरों में करें।",
+    change: "बदलें",
+    mentorChat: "मेंटर चैट",
+    conversationEnded: "यह बातचीत मेंटर द्वारा समाप्त कर दी गई है।",
+    wasHelpful:
+      "क्या यह बातचीत सहायक थी? हमें बताएं, या अगर कुछ अभी भी अनसुलझा है तो प्रश्न उठाएं।",
+    allGoodThanks: "सब ठीक, धन्यवाद",
+    wonderfulThanks:
+      "बहुत अच्छे! आज Nimo Bot से चैट करने के लिए धन्यवाद — आपकी मदद करके खुशी हुई। 🎉",
+    thanksForChatting: "आज Nimo Bot से चैट करने के लिए धन्यवाद!",
+    backToHome: "होम पर वापस जाएं",
+    exitChat: "चैट से बाहर निकलें",
+    endChatConfirm: "चैट समाप्त करें",
+    haveGreatDay: "आज Nimo Bot से चैट करने के लिए धन्यवाद! आपका दिन शुभ हो। 👋",
+    typeMessage: "अपना संदेश टाइप करें...",
+    conversationEndedPlaceholder: "बातचीत समाप्त",
+    mentorConnected: "मेंटर जुड़ा",
+    closed: "बंद",
+    waiting: "प्रतीक्षा में",
+    nimoBotOnline: "Nimo Bot ऑनलाइन",
+    switch_: "बदलें",
+    sureHowToProceed: "ज़रूर — आप कैसे आगे बढ़ना चाहेंगे?",
+    askNimoBot: "Nimo Bot से पूछें...",
+    iNeedMoreHelp: "मुझे और मदद चाहिए",
+    raiseQueryEnd: "प्रश्न उठाएं",
+    poweredBy: "Nimo Bot द्वारा संचालित",
+    unknown: "अज्ञात",
+    resumeChatting: "चैटिंग फिर से शुरू करें",
+    continueChatting: (name: string) => `${name} के साथ चैट जारी रखें`,
+    differentTopic: "अलग विषय",
+    talkDifferentMentor: "किसी और चीज़ के बारे में दूसरे मेंटर से बात करें",
+    ongoingConversation: "आपकी एक चल रही बातचीत है",
+    changeLanguageLabel: "भाषा बदलें",
+  },
+  te: {
+    welcomeMessage:
+      "హాయ్! నేను **Nimo Bot**ని, మీ AI సహాయకుడిని. కింద ఒక ప్రశ్న ఎంచుకోండి మరియు నేను మీకు సహాయం చేస్తాను.",
+    chooseLanguage: "భాష ఎంచుకోండి",
+    selectYourLanguage: "మీ భాషను ఎంచుకోండి",
+    choosePreferredLanguage: "కొనసాగించడానికి మీకు నచ్చిన భాషను ఎంచుకోండి",
+    pickQuestion: "ప్రారంభించడానికి ఒక ప్రశ్న ఎంచుకోండి",
+    categories: "వర్గాలు",
+    noCategoriesYet: "ఇంకా వర్గాలు లేవు.",
+    hereAreCategories: "ఇవిగో వర్గాలు:",
+    questions: "ప్రశ్నలు",
+    noQuestionsYet: "ఇంకా ప్రశ్నలు లేవు.",
+    hereAreQuestions: "ఇవిగో ప్రశ్నలు:",
+    noAnswerYet: "ఇంకా సమాధానం లేదు — కింద సహాయాన్ని సంప్రదించండి.",
+    cantFindAnswer: "మీ సమాధానం కనుగొనలేకపోతున్నారా?",
+    talkToSupportTeam: "మా సహాయక బృందంతో మాట్లాడండి",
+    needMoreHelp: "మరింత సహాయం కావాలా?",
+    back: "వెనుకకు",
+    hereAreFAQAgain: "మళ్ళీ FAQ ప్రశ్నలు ఇవిగో:",
+    hereAreCategoriesAgain: "మళ్ళీ వర్గాలు ఇవిగో:",
+    howToProceed: "మీరు ఎలా కొనసాగాలనుకుంటున్నారు?",
+    whichCategory: "ఇది ఏ వర్గం గురించి?",
+    contactSupport: "సహాయాన్ని సంప్రదించండి",
+    name: "పేరు",
+    mobile: "మొబైల్",
+    email: "ఇమెయిల్",
+    fullNamePlaceholder: "పూర్తి పేరు...",
+    mobilePlaceholder: "మొబైల్ నంబర్...",
+    emailPlaceholder: "ఇమెయిల్ చిరునామా...",
+    niceToMeet: (name: string) =>
+      `మిమ్మల్ని కలిసినందుకు సంతోషం, **${name}**! మొబైల్ నంబర్?`,
+    mobileNumber: "మొబైల్ నంబర్?",
+    emailAddress: "ఇమెయిల్ చిరునామా?",
+    saving: "సేవ్ చేస్తోంది...",
+    saveError:
+      "హ్మ్, నేను ఇప్పుడే మీ వివరాలను సేవ్ చేయలేకపోయాను. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    saveErrorRetry:
+      "మీ వివరాలను సేవ్ చేయడంలో ఏదో తప్పు జరిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    thanksSaved: (name: string) =>
+      `ధన్యవాదాలు, **${name}**! నేను మీ వివరాలను సేవ్ చేశాను.\n\nమీరు ఎలా కొనసాగాలనుకుంటున్నారు?`,
+    invalidName: "దయచేసి మీ పూర్తి పేరు నమోదు చేయండి (కనీసం 3 అక్షరాలు).",
+    invalidMobile: "దయచేసి చెల్లుబాటు అయ్యే మొబైల్ నంబర్ నమోదు చేయండి.",
+    invalidEmail: "దయచేసి చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామా నమోదు చేయండి.",
+    howCanWeHelp: "మేము ఎలా సహాయపడగలం?",
+    welcomeBack: (name: string) =>
+      `తిరిగి స్వాగతం, **${name}**! మీరు ఎలా కొనసాగాలనుకుంటున్నారు?`,
+    notYou: "మీరు కాదా? వివరాలను నవీకరించండి",
+    chatWithBot: "Nimo Bot తో చాట్ చేయండి",
+    chatWithBotDesc: "Nimo Bot AI నుండి తక్షణ సమాధానాలు పొందండి",
+    talkToMentor: "మెంటర్ తో మాట్లాడండి",
+    talkToMentorDesc: "ఒక విషయ నిపుణుడితో లైవ్ గా కనెక్ట్ అవ్వండి",
+    raiseQuery: "ప్రశ్నను నమోదు చేయండి",
+    raiseQueryDesc: "మా బృందం ట్రాక్ చేయడానికి ఒక టికెట్ నమోదు చేయండి",
+    endChat: "చాట్ ముగించండి",
+    endChatDesc: "ప్రస్తుతానికి ఈ సంభాషణను మూసివేయండి",
+    youAreNowChatting: (name: string) =>
+      `మీరు ఇప్పుడు Nimo Bot AI తో చాట్ చేస్తున్నారు, **${name}**. ఏదైనా అడగండి.`,
+    pickTopic: "మీ మెంటర్ కోసం ఒక విషయాన్ని ఎంచుకోండి",
+    noMentorCategories: "ప్రస్తుతం మెంటర్ వర్గాలు అందుబాటులో లేవు.",
+    couldntLoadTopics:
+      "మెంటర్ విషయాలను లోడ్ చేయలేకపోయాము — దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    connecting: "కనెక్ట్ చేస్తోంది...",
+    connectingYouWith: (expert: string, category: string) =>
+      `మిమ్మల్ని **${expert}** తో కనెక్ట్ చేస్తోంది, **${category}** కోసం మీ మెంటర్...`,
+    nowTalkingTo: (expert: string) =>
+      `మీరు ఇప్పుడు **${expert}** తో మాట్లాడుతున్నారు. హలో చెప్పండి! 👋`,
+    couldntStartConversation: (expert: string) =>
+      `**${expert}** తో సంభాషణ ప్రారంభించలేకపోయాము — దయచేసి మళ్ళీ ప్రయత్నించండి.`,
+    noMentorsAvailable: (category: string) =>
+      `**${category}** కోసం మెంటర్లు అందుబాటులో లేరు. మరొకటి ప్రయత్నించండి.`,
+    connectionError:
+      "మిమ్మల్ని మెంటర్ తో కనెక్ట్ చేయడంలో ఏదో తప్పు జరిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    resumeConversation: "సంభాషణను తిరిగి ప్రారంభించండి",
+    resumeConversationDesc: (name: string) => `${name} తో చాటింగ్ కొనసాగించండి`,
+    startNewTopic: "కొత్త విషయం ప్రారంభించండి",
+    startNewTopicDesc: "వేరే దాని గురించి వేరే మెంటర్ తో మాట్లాడండి",
+    youHaveActiveConversation: "మీకు ఒక కొనసాగుతున్న సంభాషణ ఉంది",
+    aboutTopic: (topic: string) =>
+      `${topic} గురించి — తిరిగి ప్రారంభించడానికి టాప్ చేయండి`,
+    tapToResume: "తిరిగి ప్రారంభించడానికి టాప్ చేయండి",
+    resumingConversation: "మీ సంభాషణ తిరిగి ప్రారంభమవుతోంది...",
+    activeConversationPrompt:
+      "మీకు ఇప్పటికే ఒక కొనసాగుతున్న సంభాషణ ఉంది. మీరు దాన్ని తిరిగి ప్రారంభించాలనుకుంటున్నారా లేదా కొత్త విషయం ప్రారంభించాలనుకుంటున్నారా?",
+    raiseAQuery: "ప్రశ్నను నమోదు చేయండి",
+    whichCategoryQuery: "మీ ప్రశ్న ఏ వర్గానికి చెందుతుంది?",
+    gotItTitleDetails: "అర్థమైంది. ఇప్పుడు నాకు శీర్షిక మరియు వివరాలు ఇవ్వండి.",
+    giveMeTitleDetails: "నాకు శీర్షిక మరియు వివరాలు ఇవ్వండి.",
+    notSureSkip: "ఖచ్చితంగా తెలియదు — వర్గాన్ని దాటవేయండి",
+    noProblemTitleDetails: "సమస్య లేదు. నాకు శీర్షిక మరియు వివరాలు ఇవ్వండి.",
+    skipCategory: "దాటవేయండి — నాకు ఏ వర్గమో తెలియదు",
+    queryTitle: "ప్రశ్న శీర్షిక",
+    describeIssue: "సమస్యను వివరించండి",
+    queryTitlePlaceholder: "ఉదా. అసైన్ మెంట్ సమర్పించలేకపోతున్నాను",
+    describeIssuePlaceholder: "ఏమి జరిగిందో మాకు చెప్పండి...",
+    submitQuery: "ప్రశ్నను సమర్పించండి",
+    submitting: "సమర్పిస్తోంది...",
+    queryRegistered: "మీ ప్రశ్న నమోదు చేయబడింది!",
+    querySubmitError:
+      "నేను మీ ప్రశ్నను సమర్పించలేకపోయాను — దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    querySubmitErrorRetry:
+      "మీ ప్రశ్నను సమర్పించడంలో ఏదో తప్పు జరిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    selectCategoryError: "దయచేసి మీ ప్రశ్న కోసం ఒక వర్గాన్ని ఎంచుకోండి.",
+    queryTitleError: "దయచేసి ప్రశ్న శీర్షిక నమోదు చేయండి (కనీసం 5 అక్షరాలు).",
+    queryDescriptionError: "దయచేసి మీ సమస్యను కనీసం 10 అక్షరాలలో వివరించండి.",
+    change: "మార్చండి",
+    mentorChat: "మెంటర్ చాట్",
+    conversationEnded: "ఈ సంభాషణ మెంటర్ ద్వారా ముగించబడింది.",
+    wasHelpful:
+      "ఈ సంభాషణ సహాయకరంగా ఉందా? మాకు తెలియజేయండి, లేదా ఇంకా ఏదైనా పరిష్కరించబడకపోతే ప్రశ్నను నమోదు చేయండి.",
+    allGoodThanks: "అంతా బాగుంది, ధన్యవాదాలు",
+    wonderfulThanks:
+      "అద్భుతం! ఈరోజు Nimo Bot తో చాట్ చేసినందుకు ధన్యవాదాలు — మీకు సహాయం చేయడం ఆనందంగా ఉంది. 🎉",
+    thanksForChatting: "ఈరోజు Nimo Bot తో చాట్ చేసినందుకు ధన్యవాదాలు!",
+    backToHome: "హోమ్ కు తిరిగి వెళ్ళండి",
+    exitChat: "చాట్ నుండి నిష్క్రమించండి",
+    endChatConfirm: "చాట్ ముగించండి",
+    haveGreatDay:
+      "ఈరోజు Nimo Bot తో చాట్ చేసినందుకు ధన్యవాదాలు! మీకు మంచి రోజు. 👋",
+    typeMessage: "మీ సందేశాన్ని టైప్ చేయండి...",
+    conversationEndedPlaceholder: "సంభాషణ ముగిసింది",
+    mentorConnected: "మెంటర్ కనెక్ట్ అయ్యారు",
+    closed: "మూసివేయబడింది",
+    waiting: "వేచి ఉంది",
+    nimoBotOnline: "Nimo Bot ఆన్ లైన్",
+    switch_: "మార్చండి",
+    sureHowToProceed: "తప్పకుండా — మీరు ఎలా కొనసాగాలనుకుంటున్నారు?",
+    askNimoBot: "Nimo Bot ని అడగండి...",
+    iNeedMoreHelp: "నాకు మరింత సహాయం కావాలి",
+    raiseQueryEnd: "ప్రశ్నను నమోదు చేయండి",
+    poweredBy: "Nimo Bot ద్వారా నడుపబడుతోంది",
+    unknown: "తెలియని",
+    resumeChatting: "చాటింగ్ తిరిగి ప్రారంభించండి",
+    continueChatting: (name: string) => `${name} తో చాటింగ్ కొనసాగించండి`,
+    differentTopic: "వేరే విషయం",
+    talkDifferentMentor: "వేరే దాని గురించి వేరే మెంటర్ తో మాట్లాడండి",
+    ongoingConversation: "మీకు ఒక కొనసాగుతున్న సంభాషణ ఉంది",
+    changeLanguageLabel: "భాష మార్చండి",
+  },
+  ta: {
+    welcomeMessage:
+      "வணக்கம்! நான் **Nimo Bot**, உங்கள் AI உதவியாளர். கீழே ஒரு கேள்வியைத் தேர்ந்தெடுங்கள், நான் உங்களுக்கு உதவுகிறேன்.",
+    chooseLanguage: "மொழியைத் தேர்ந்தெடுக்கவும்",
+    selectYourLanguage: "உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்",
+    choosePreferredLanguage:
+      "தொடர உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்",
+    pickQuestion: "தொடங்க ஒரு கேள்வியைத் தேர்ந்தெடுக்கவும்",
+    categories: "வகைகள்",
+    noCategoriesYet: "இன்னும் வகைகள் இல்லை.",
+    hereAreCategories: "இதோ வகைகள்:",
+    questions: "கேள்விகள்",
+    noQuestionsYet: "இன்னும் கேள்விகள் இல்லை.",
+    hereAreQuestions: "இதோ கேள்விகள்:",
+    noAnswerYet: "இன்னும் பதில் இல்லை — கீழே ஆதரவைத் தொடர்பு கொள்ளவும்.",
+    cantFindAnswer: "உங்கள் பதிலைக் கண்டுபிடிக்க முடியவில்லையா?",
+    talkToSupportTeam: "எங்கள் ஆதரவு குழுவுடன் பேசுங்கள்",
+    needMoreHelp: "மேலும் உதவி தேவையா?",
+    back: "பின்",
+    hereAreFAQAgain: "மீண்டும் FAQ கேள்விகள் இதோ:",
+    hereAreCategoriesAgain: "மீண்டும் வகைகள் இதோ:",
+    howToProceed: "நீங்கள் எவ்வாறு தொடர விரும்புகிறீர்கள்?",
+    whichCategory: "இது எந்த வகையைப் பற்றியது?",
+    contactSupport: "ஆதரவைத் தொடர்பு கொள்ளவும்",
+    name: "பெயர்",
+    mobile: "மொபைல்",
+    email: "மின்னஞ்சல்",
+    fullNamePlaceholder: "முழு பெயர்...",
+    mobilePlaceholder: "மொபைல் எண்...",
+    emailPlaceholder: "மின்னஞ்சல் முகவரி...",
+    niceToMeet: (name: string) =>
+      `உங்களைச் சந்தித்ததில் மகிழ்ச்சி, **${name}**! மொபைல் எண்?`,
+    mobileNumber: "மொபைல் எண்?",
+    emailAddress: "மின்னஞ்சல் முகவரி?",
+    saving: "சேமிக்கிறது...",
+    saveError:
+      "ம்ம், என்னால் இப்போது உங்கள் விவரங்களைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    saveErrorRetry:
+      "உங்கள் விவரங்களைச் சேமிப்பதில் ஏதோ தவறு. மீண்டும் முயற்சிக்கவும்.",
+    thanksSaved: (name: string) =>
+      `நன்றி, **${name}**! உங்கள் விவரங்களைச் சேமித்துள்ளேன்.\n\nநீங்கள் எவ்வாறு தொடர விரும்புகிறீர்கள்?`,
+    invalidName:
+      "தயவுசெய்து உங்கள் முழு பெயரை உள்ளிடவும் (குறைந்தது 3 எழுத்துகள்).",
+    invalidMobile: "தயவுசெய்து செல்லுபடியாகும் மொபைல் எண்ணை உள்ளிடவும்.",
+    invalidEmail: "தயவுசெய்து செல்லுபடியாகும் மின்னஞ்சல் முகவரியை உள்ளிடவும்.",
+    howCanWeHelp: "நாங்கள் எவ்வாறு உதவ முடியும்?",
+    welcomeBack: (name: string) =>
+      `மீண்டும் வரவேற்கிறோம், **${name}**! நீங்கள் எவ்வாறு தொடர விரும்புகிறீர்கள்?`,
+    notYou: "நீங்கள் இல்லையா? விவரங்களைப் புதுப்பிக்கவும்",
+    chatWithBot: "Nimo Bot உடன் அரட்டையடிக்கவும்",
+    chatWithBotDesc: "Nimo Bot AI இலிருந்து உடனடி பதில்களைப் பெறுங்கள்",
+    talkToMentor: "வழிகாட்டியுடன் பேசுங்கள்",
+    talkToMentorDesc: "தலைப்பு நிபுணருடன் நேரடியாக இணைந்திருங்கள்",
+    raiseQuery: "கேள்வியை எழுப்புங்கள்",
+    raiseQueryDesc: "எங்கள் குழு கண்காணிக்க ஒரு டிக்கெட்டைப் பதிவு செய்யுங்கள்",
+    endChat: "அரட்டையை முடிக்கவும்",
+    endChatDesc: "இப்போதைக்கு இந்த உரையாடலை மூடவும்",
+    youAreNowChatting: (name: string) =>
+      `நீங்கள் இப்போது Nimo Bot AI உடன் அரட்டையடிக்கிறீர்கள், **${name}**. எதையும் கேளுங்கள்.`,
+    pickTopic: "உங்கள் வழிகாட்டிக்கு ஒரு தலைப்பைத் தேர்ந்தெடுக்கவும்",
+    noMentorCategories: "இப்போது வழிகாட்டி வகைகள் எதுவும் இல்லை.",
+    couldntLoadTopics:
+      "வழிகாட்டி தலைப்புகளை ஏற்ற முடியவில்லை — மீண்டும் முயற்சிக்கவும்.",
+    connecting: "இணைக்கிறது...",
+    connectingYouWith: (expert: string, category: string) =>
+      `உங்களை **${expert}** உடன் இணைக்கிறது, **${category}** க்கான உங்கள் வழிகாட்டி...`,
+    nowTalkingTo: (expert: string) =>
+      `நீங்கள் இப்போது **${expert}** உடன் பேசுகிறீர்கள். வணக்கம் சொல்லுங்கள்! 👋`,
+    couldntStartConversation: (expert: string) =>
+      `**${expert}** உடன் உரையாடலைத் தொடங்க முடியவில்லை — மீண்டும் முயற்சிக்கவும்.`,
+    noMentorsAvailable: (category: string) =>
+      `**${category}** க்கு வழிகாட்டிகள் யாரும் இல்லை. மற்றொன்றை முயற்சிக்கவும்.`,
+    connectionError:
+      "உங்களை வழிகாட்டியுடன் இணைப்பதில் ஏதோ தவறு. மீண்டும் முயற்சிக்கவும்.",
+    resumeConversation: "உரையாடலை மீண்டும் தொடங்கவும்",
+    resumeConversationDesc: (name: string) =>
+      `${name} உடன் அரட்டையைத் தொடரவும்`,
+    startNewTopic: "புதிய தலைப்பைத் தொடங்கவும்",
+    startNewTopicDesc: "வேறு ஏதாவது பற்றி வேறு வழிகாட்டியுடன் பேசுங்கள்",
+    youHaveActiveConversation:
+      "உங்களுக்கு ஒரு நடந்துகொண்டிருக்கும் உரையாடல் உள்ளது",
+    aboutTopic: (topic: string) => `${topic} பற்றி — மீண்டும் தொடங்க தட்டவும்`,
+    tapToResume: "மீண்டும் தொடங்க தட்டவும்",
+    resumingConversation: "உங்கள் உரையாடல் மீண்டும் தொடங்குகிறது...",
+    activeConversationPrompt:
+      "உங்களுக்கு ஏற்கனவே ஒரு நடந்துகொண்டிருக்கும் உரையாடல் உள்ளது. அதை மீண்டும் தொடங்க விரும்புகிறீர்களா அல்லது புதிய தலைப்பைத் தொடங்க விரும்புகிறீர்களா?",
+    raiseAQuery: "கேள்வியை எழுப்புங்கள்",
+    whichCategoryQuery: "உங்கள் கேள்வி எந்த வகையைச் சேர்ந்தது?",
+    gotItTitleDetails:
+      "புரிந்தது. இப்போது எனக்கு தலைப்பு மற்றும் விவரங்களைக் கொடுங்கள்.",
+    giveMeTitleDetails: "எனக்கு தலைப்பு மற்றும் விவரங்களைக் கொடுங்கள்.",
+    notSureSkip: "உறுதியாகத் தெரியவில்லை — வகையைத் தவிர்க்கவும்",
+    noProblemTitleDetails:
+      "பரவாயில்லை. எனக்கு தலைப்பு மற்றும் விவரங்களைக் கொடுங்கள்.",
+    skipCategory: "தவிர்க்கவும் — எனக்கு எந்த வகை என்று தெரியவில்லை",
+    queryTitle: "கேள்வி தலைப்பு",
+    describeIssue: "சிக்கலை விவரிக்கவும்",
+    queryTitlePlaceholder: "எ.கா. பணியைச் சமர்ப்பிக்க முடியவில்லை",
+    describeIssuePlaceholder: "என்ன நடந்தது என்பதை எங்களிடம் சொல்லுங்கள்...",
+    submitQuery: "கேள்வியைச் சமர்ப்பிக்கவும்",
+    submitting: "சமர்ப்பிக்கிறது...",
+    queryRegistered: "உங்கள் கேள்வி பதிவு செய்யப்பட்டது!",
+    querySubmitError:
+      "என்னால் உங்கள் கேள்வியைச் சமர்ப்பிக்க முடியவில்லை — மீண்டும் முயற்சிக்கவும்.",
+    querySubmitErrorRetry:
+      "உங்கள் கேள்வியைச் சமர்ப்பிப்பதில் ஏதோ தவறு. மீண்டும் முயற்சிக்கவும்.",
+    selectCategoryError:
+      "தயவுசெய்து உங்கள் கேள்விக்கு ஒரு வகையைத் தேர்ந்தெடுக்கவும்.",
+    queryTitleError:
+      "தயவுசெய்து கேள்வி தலைப்பை உள்ளிடவும் (குறைந்தது 5 எழுத்துகள்).",
+    queryDescriptionError:
+      "தயவுசெய்து உங்கள் சிக்கலை குறைந்தது 10 எழுத்துகளில் விவரிக்கவும்.",
+    change: "மாற்றவும்",
+    mentorChat: "வழிகாட்டி அரட்டை",
+    conversationEnded: "இந்த உரையாடல் வழிகாட்டியால் முடிக்கப்பட்டது.",
+    wasHelpful:
+      "இந்த உரையாடல் பயனுள்ளதாக இருந்ததா? எங்களுக்குத் தெரியப்படுத்துங்கள், அல்லது ஏதாவது இன்னும் தீர்க்கப்படவில்லை என்றால் கேள்வியை எழுப்புங்கள்.",
+    allGoodThanks: "எல்லாம் நன்றாக உள்ளது, நன்றி",
+    wonderfulThanks:
+      "அற்புதம்! இன்று Nimo Bot உடன் அரட்டையடித்ததற்கு நன்றி — உங்களுக்கு உதவியதில் மகிழ்ச்சி. 🎉",
+    thanksForChatting: "இன்று Nimo Bot உடன் அரட்டையடித்ததற்கு நன்றி!",
+    backToHome: "முகப்புக்குத் திரும்பு",
+    exitChat: "அரட்டையிலிருந்து வெளியேறு",
+    endChatConfirm: "அரட்டையை முடிக்கவும்",
+    haveGreatDay: "இன்று Nimo Bot உடன் அரட்டையடித்ததற்கு நன்றி! இனிய நாள். 👋",
+    typeMessage: "உங்கள் செய்தியைத் தட்டச்சு செய்யவும்...",
+    conversationEndedPlaceholder: "உரையாடல் முடிந்தது",
+    mentorConnected: "வழிகாட்டி இணைக்கப்பட்டார்",
+    closed: "மூடப்பட்டது",
+    waiting: "காத்திருக்கிறது",
+    nimoBotOnline: "Nimo Bot ஆன்லைன்",
+    switch_: "மாற்று",
+    sureHowToProceed: "நிச்சயமாக — நீங்கள் எவ்வாறு தொடர விரும்புகிறீர்கள்?",
+    askNimoBot: "Nimo Bot ஐக் கேளுங்கள்...",
+    iNeedMoreHelp: "எனக்கு மேலும் உதவி தேவை",
+    raiseQueryEnd: "கேள்வியை எழுப்புங்கள்",
+    poweredBy: "Nimo Bot மூலம் இயக்கப்படுகிறது",
+    unknown: "தெரியவில்லை",
+    resumeChatting: "அரட்டையை மீண்டும் தொடங்கவும்",
+    continueChatting: (name: string) => `${name} உடன் அரட்டையைத் தொடரவும்`,
+    differentTopic: "வேறு தலைப்பு",
+    talkDifferentMentor: "வேறு ஏதாவது பற்றி வேறு வழிகாட்டியுடன் பேசுங்கள்",
+    ongoingConversation: "உங்களுக்கு ஒரு நடந்துகொண்டிருக்கும் உரையாடல் உள்ளது",
+    changeLanguageLabel: "மொழியை மாற்று",
+  },
+  kn: {
+    welcomeMessage:
+      "ಹಾಯ್! ನಾನು **Nimo Bot**, ನಿಮ್ಮ AI ಸಹಾಯಕ. ಕೆಳಗೆ ಒಂದು ಪ್ರಶ್ನೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ ಮತ್ತು ನಾನು ನಿಮಗೆ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
+    chooseLanguage: "ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ",
+    selectYourLanguage: "ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    choosePreferredLanguage: "ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಆದ್ಯತೆಯ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    pickQuestion: "ಪ್ರಾರಂಭಿಸಲು ಒಂದು ಪ್ರಶ್ನೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    categories: "ವರ್ಗಗಳು",
+    noCategoriesYet: "ಇನ್ನೂ ಯಾವುದೇ ವರ್ಗಗಳಿಲ್ಲ.",
+    hereAreCategories: "ಇವು ವರ್ಗಗಳು:",
+    questions: "ಪ್ರಶ್ನೆಗಳು",
+    noQuestionsYet: "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರಶ್ನೆಗಳಿಲ್ಲ.",
+    hereAreQuestions: "ಇವು ಪ್ರಶ್ನೆಗಳು:",
+    noAnswerYet: "ಇನ್ನೂ ಉತ್ತರವಿಲ್ಲ — ಕೆಳಗೆ ಬೆಂಬಲವನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    cantFindAnswer: "ನಿಮ್ಮ ಉತ್ತರ ಸಿಗುತ್ತಿಲ್ಲವೇ?",
+    talkToSupportTeam: "ನಮ್ಮ ಬೆಂಬಲ ತಂಡದೊಂದಿಗೆ ಮಾತನಾಡಿ",
+    needMoreHelp: "ಇನ್ನಷ್ಟು ಸಹಾಯ ಬೇಕೇ?",
+    back: "ಹಿಂದೆ",
+    hereAreFAQAgain: "ಮತ್ತೆ FAQ ಪ್ರಶ್ನೆಗಳು ಇಲ್ಲಿವೆ:",
+    hereAreCategoriesAgain: "ಮತ್ತೆ ವರ್ಗಗಳು ಇಲ್ಲಿವೆ:",
+    howToProceed: "ನೀವು ಹೇಗೆ ಮುಂದುವರಿಯಲು ಬಯಸುತ್ತೀರಿ?",
+    whichCategory: "ಇದು ಯಾವ ವರ್ಗದ ಬಗ್ಗೆ?",
+    contactSupport: "ಬೆಂಬಲವನ್ನು ಸಂಪರ್ಕಿಸಿ",
+    name: "ಹೆಸರು",
+    mobile: "ಮೊಬೈಲ್",
+    email: "ಇಮೇಲ್",
+    fullNamePlaceholder: "ಪೂರ್ಣ ಹೆಸರು...",
+    mobilePlaceholder: "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ...",
+    emailPlaceholder: "ಇಮೇಲ್ ವಿಳಾಸ...",
+    niceToMeet: (name: string) =>
+      `ನಿಮ್ಮನ್ನು ಭೇಟಿಯಾಗಿ ಸಂತೋಷ, **${name}**! ಮೊಬೈಲ್ ಸಂಖ್ಯೆ?`,
+    mobileNumber: "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ?",
+    emailAddress: "ಇಮೇಲ್ ವಿಳಾಸ?",
+    saving: "ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
+    saveError:
+      "ಹ್ಮ್, ನಾನು ಈಗ ನಿಮ್ಮ ವಿವರಗಳನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    saveErrorRetry:
+      "ನಿಮ್ಮ ವಿವರಗಳನ್ನು ಉಳಿಸುವಲ್ಲಿ ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    thanksSaved: (name: string) =>
+      `ಧನ್ಯವಾದಗಳು, **${name}**! ನಾನು ನಿಮ್ಮ ವಿವರಗಳನ್ನು ಉಳಿಸಿದ್ದೇನೆ.\n\nನೀವು ಹೇಗೆ ಮುಂದುವರಿಯಲು ಬಯಸುತ್ತೀರಿ?`,
+    invalidName: "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪೂರ್ಣ ಹೆಸರನ್ನು ನಮೂದಿಸಿ (ಕನಿಷ್ಠ 3 ಅಕ್ಷರಗಳು).",
+    invalidMobile: "ದಯವಿಟ್ಟು ಮಾನ್ಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ.",
+    invalidEmail: "ದಯವಿಟ್ಟು ಮಾನ್ಯ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ನಮೂದಿಸಿ.",
+    howCanWeHelp: "ನಾವು ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?",
+    welcomeBack: (name: string) =>
+      `ಮರಳಿ ಸ್ವಾಗತ, **${name}**! ನೀವು ಹೇಗೆ ಮುಂದುವರಿಯಲು ಬಯಸುತ್ತೀರಿ?`,
+    notYou: "ನೀವಲ್ಲವೇ? ವಿವರಗಳನ್ನು ನವೀಕರಿಸಿ",
+    chatWithBot: "Nimo Bot ಜೊತೆ ಚಾಟ್ ಮಾಡಿ",
+    chatWithBotDesc: "Nimo Bot AI ನಿಂದ ತ್ವರಿತ ಉತ್ತರಗಳನ್ನು ಪಡೆಯಿರಿ",
+    talkToMentor: "ಮಾರ್ಗದರ್ಶಕರೊಂದಿಗೆ ಮಾತನಾಡಿ",
+    talkToMentorDesc: "ವಿಷಯ ತಜ್ಞರೊಂದಿಗೆ ಲೈವ್ ಆಗಿ ಸಂಪರ್ಕ ಹೊಂದಿರಿ",
+    raiseQuery: "ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸಿ",
+    raiseQueryDesc: "ನಮ್ಮ ತಂಡ ಟ್ರ್ಯಾಕ್ ಮಾಡಲು ಟಿಕೆಟ್ ದಾಖಲಿಸಿ",
+    endChat: "ಚಾಟ್ ಕೊನೆಗೊಳಿಸಿ",
+    endChatDesc: "ಸದ್ಯಕ್ಕೆ ಈ ಸಂಭಾಷಣೆಯನ್ನು ಮುಚ್ಚಿ",
+    youAreNowChatting: (name: string) =>
+      `ನೀವು ಈಗ Nimo Bot AI ಜೊತೆ ಚಾಟ್ ಮಾಡುತ್ತಿದ್ದೀರಿ, **${name}**. ಏನು ಬೇಕಾದರೂ ಕೇಳಿ.`,
+    pickTopic: "ನಿಮ್ಮ ಮಾರ್ಗದರ್ಶಕರಿಗೆ ವಿಷಯವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    noMentorCategories: "ಇದೀಗ ಯಾವುದೇ ಮಾರ್ಗದರ್ಶಕ ವರ್ಗಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+    couldntLoadTopics:
+      "ಮಾರ್ಗದರ್ಶಕ ವಿಷಯಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    connecting: "ಸಂಪರ್ಕಿಸಲಾಗುತ್ತಿದೆ...",
+    connectingYouWith: (expert: string, category: string) =>
+      `ನಿಮ್ಮನ್ನು **${expert}** ಜೊತೆ ಸಂಪರ್ಕಿಸುತ್ತಿದೆ, **${category}** ಗೆ ನಿಮ್ಮ ಮಾರ್ಗದರ್ಶಕ...`,
+    nowTalkingTo: (expert: string) =>
+      `ನೀವು ಈಗ **${expert}** ಜೊತೆ ಮಾತನಾಡುತ್ತಿದ್ದೀರಿ. ಹಲೋ ಹೇಳಿ! 👋`,
+    couldntStartConversation: (expert: string) =>
+      `**${expert}** ಜೊತೆ ಸಂಭಾಷಣೆ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.`,
+    noMentorsAvailable: (category: string) =>
+      `**${category}** ಗೆ ಯಾವುದೇ ಮಾರ್ಗದರ್ಶಕರು ಲಭ್ಯವಿಲ್ಲ. ಬೇರೆ ಪ್ರಯತ್ನಿಸಿ.`,
+    connectionError:
+      "ನಿಮ್ಮನ್ನು ಮಾರ್ಗದರ್ಶಕರೊಂದಿಗೆ ಸಂಪರ್ಕಿಸುವಲ್ಲಿ ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    resumeConversation: "ಸಂಭಾಷಣೆಯನ್ನು ಪುನರಾರಂಭಿಸಿ",
+    resumeConversationDesc: (name: string) => `${name} ಜೊತೆ ಚಾಟಿಂಗ್ ಮುಂದುವರಿಸಿ`,
+    startNewTopic: "ಹೊಸ ವಿಷಯ ಪ್ರಾರಂಭಿಸಿ",
+    startNewTopicDesc: "ಬೇರೆ ಯಾವುದೋ ಬಗ್ಗೆ ಬೇರೆ ಮಾರ್ಗದರ್ಶಕರೊಂದಿಗೆ ಮಾತನಾಡಿ",
+    youHaveActiveConversation: "ನಿಮಗೆ ಒಂದು ನಡೆಯುತ್ತಿರುವ ಸಂಭಾಷಣೆ ಇದೆ",
+    aboutTopic: (topic: string) => `${topic} ಬಗ್ಗೆ — ಪುನರಾರಂಭಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ`,
+    tapToResume: "ಪುನರಾರಂಭಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
+    resumingConversation: "ನಿಮ್ಮ ಸಂಭಾಷಣೆ ಪುನರಾರಂಭಗೊಳ್ಳುತ್ತಿದೆ...",
+    activeConversationPrompt:
+      "ನಿಮಗೆ ಈಗಾಗಲೇ ಒಂದು ನಡೆಯುತ್ತಿರುವ ಸಂಭಾಷಣೆ ಇದೆ. ನೀವು ಅದನ್ನು ಪುನರಾರಂಭಿಸಲು ಬಯಸುವಿರಾ ಅಥವಾ ಹೊಸ ವಿಷಯ ಪ್ರಾರಂಭಿಸಲು ಬಯಸುವಿರಾ?",
+    raiseAQuery: "ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸಿ",
+    whichCategoryQuery: "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಯಾವ ವರ್ಗಕ್ಕೆ ಸೇರುತ್ತದೆ?",
+    gotItTitleDetails: "ಅರ್ಥವಾಯಿತು. ಈಗ ನನಗೆ ಶೀರ್ಷಿಕೆ ಮತ್ತು ವಿವರಗಳನ್ನು ನೀಡಿ.",
+    giveMeTitleDetails: "ನನಗೆ ಶೀರ್ಷಿಕೆ ಮತ್ತು ವಿವರಗಳನ್ನು ನೀಡಿ.",
+    notSureSkip: "ಖಚಿತವಿಲ್ಲ — ವರ್ಗವನ್ನು ಬಿಟ್ಟುಬಿಡಿ",
+    noProblemTitleDetails: "ತೊಂದರೆ ಇಲ್ಲ. ನನಗೆ ಶೀರ್ಷಿಕೆ ಮತ್ತು ವಿವರಗಳನ್ನು ನೀಡಿ.",
+    skipCategory: "ಬಿಟ್ಟುಬಿಡಿ — ನನಗೆ ಯಾವ ವರ್ಗ ಎಂದು ಗೊತ್ತಿಲ್ಲ",
+    queryTitle: "ಪ್ರಶ್ನೆ ಶೀರ್ಷಿಕೆ",
+    describeIssue: "ಸಮಸ್ಯೆಯನ್ನು ವಿವರಿಸಿ",
+    queryTitlePlaceholder: "ಉದಾ. ನಿಯೋಜನೆಯನ್ನು ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ",
+    describeIssuePlaceholder: "ಏನಾಯಿತು ಎಂದು ನಮಗೆ ತಿಳಿಸಿ...",
+    submitQuery: "ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸಿ",
+    submitting: "ಸಲ್ಲಿಸಲಾಗುತ್ತಿದೆ...",
+    queryRegistered: "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ನೋಂದಾಯಿಸಲಾಗಿದೆ!",
+    querySubmitError:
+      "ನಾನು ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    querySubmitErrorRetry:
+      "ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸುವಲ್ಲಿ ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    selectCategoryError: "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪ್ರಶ್ನೆಗೆ ಒಂದು ವರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    queryTitleError:
+      "ದಯವಿಟ್ಟು ಪ್ರಶ್ನೆ ಶೀರ್ಷಿಕೆಯನ್ನು ನಮೂದಿಸಿ (ಕನಿಷ್ಠ 5 ಅಕ್ಷರಗಳು).",
+    queryDescriptionError:
+      "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ಕನಿಷ್ಠ 10 ಅಕ್ಷರಗಳಲ್ಲಿ ವಿವರಿಸಿ.",
+    change: "ಬದಲಾಯಿಸಿ",
+    mentorChat: "ಮಾರ್ಗದರ್ಶಕ ಚಾಟ್",
+    conversationEnded: "ಈ ಸಂಭಾಷಣೆಯನ್ನು ಮಾರ್ಗದರ್ಶಕರು ಕೊನೆಗೊಳಿಸಿದ್ದಾರೆ.",
+    wasHelpful:
+      "ಈ ಸಂಭಾಷಣೆ ಸಹಾಯಕವಾಗಿತ್ತೇ? ನಮಗೆ ತಿಳಿಸಿ, ಅಥವಾ ಇನ್ನೂ ಏನಾದರೂ ಬಗೆಹರಿಯದಿದ್ದರೆ ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸಿ.",
+    allGoodThanks: "ಎಲ್ಲಾ ಸರಿಯಾಗಿದೆ, ಧನ್ಯವಾದಗಳು",
+    wonderfulThanks:
+      "ಅದ್ಭುತ! ಇಂದು Nimo Bot ಜೊತೆ ಚಾಟ್ ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದಗಳು — ನಿಮಗೆ ಸಹಾಯ ಮಾಡಲು ಸಂತೋಷವಾಯಿತು. 🎉",
+    thanksForChatting: "ಇಂದು Nimo Bot ಜೊತೆ ಚಾಟ್ ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದಗಳು!",
+    backToHome: "ಮುಖಪುಟಕ್ಕೆ ಹಿಂತಿರುಗಿ",
+    exitChat: "ಚಾಟ್ ನಿಂದ ನಿರ್ಗಮಿಸಿ",
+    endChatConfirm: "ಚಾಟ್ ಕೊನೆಗೊಳಿಸಿ",
+    haveGreatDay: "ಇಂದು Nimo Bot ಜೊತೆ ಚಾಟ್ ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದಗಳು! ಶುಭ ದಿನ. 👋",
+    typeMessage: "ನಿಮ್ಮ ಸಂದೇಶವನ್ನು ಟೈಪ್ ಮಾಡಿ...",
+    conversationEndedPlaceholder: "ಸಂಭಾಷಣೆ ಕೊನೆಗೊಂಡಿದೆ",
+    mentorConnected: "ಮಾರ್ಗದರ್ಶಕರು ಸಂಪರ್ಕಿತರಾಗಿದ್ದಾರೆ",
+    closed: "ಮುಚ್ಚಲಾಗಿದೆ",
+    waiting: "ಕಾಯುತ್ತಿದೆ",
+    nimoBotOnline: "Nimo Bot ಆನ್‌ಲೈನ್",
+    switch_: "ಬದಲಾಯಿಸಿ",
+    sureHowToProceed: "ಖಂಡಿತ — ನೀವು ಹೇಗೆ ಮುಂದುವರಿಯಲು ಬಯಸುತ್ತೀರಿ?",
+    askNimoBot: "Nimo Bot ಅನ್ನು ಕೇಳಿ...",
+    iNeedMoreHelp: "ನನಗೆ ಇನ್ನಷ್ಟು ಸಹಾಯ ಬೇಕು",
+    raiseQueryEnd: "ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸಿ",
+    poweredBy: "Nimo Bot ಮೂಲಕ ಚಾಲಿತ",
+    unknown: "ಅಜ್ಞಾತ",
+    resumeChatting: "ಚಾಟಿಂಗ್ ಪುನರಾರಂಭಿಸಿ",
+    continueChatting: (name: string) => `${name} ಜೊತೆ ಚಾಟಿಂಗ್ ಮುಂದುವರಿಸಿ`,
+    differentTopic: "ಬೇರೆ ವಿಷಯ",
+    talkDifferentMentor: "ಬೇರೆ ಯಾವುದೋ ಬಗ್ಗೆ ಬೇರೆ ಮಾರ್ಗದರ್ಶಕರೊಂದಿಗೆ ಮಾತನಾಡಿ",
+    ongoingConversation: "ನಿಮಗೆ ಒಂದು ನಡೆಯುತ್ತಿರುವ ಸಂಭಾಷಣೆ ಇದೆ",
+    changeLanguageLabel: "ಭಾಷೆ ಬದಲಾಯಿಸಿ",
+  },
+};
+
+// ========== Helper function to get translation ==========
+function getTranslation(
+  lang: string | undefined,
+  key: keyof Translations,
+): string | ((...args: any[]) => string) {
+  const t = translations[lang as SupportedLanguage] || translations.en;
+  return t[key];
+}
+
 const MENTOR_STEPS: {
   key: MentorFormStep;
-  label: string;
+  labelKey: keyof Translations;
   icon: JSX.Element;
 }[] = [
-  { key: "name", label: "Name", icon: <User size={12} /> },
-  { key: "mobile", label: "Mobile", icon: <Phone size={12} /> },
-  { key: "email", label: "Email", icon: <Mail size={12} /> },
+  { key: "name", labelKey: "name", icon: <User size={12} /> },
+  { key: "mobile", labelKey: "mobile", icon: <Phone size={12} /> },
+  { key: "email", labelKey: "email", icon: <Mail size={12} /> },
 ];
 
 // ========== VALIDATION FUNCTIONS ==========
@@ -2171,26 +1016,13 @@ const isValidChatMessage = (value: string) => {
   return value.trim().length > 0 && value.trim().length <= 1000;
 };
 
-// Sanitize name: trim and normalize spaces
 const sanitizeName = (value: string) => {
   return value.trim().replace(/\s+/g, " ");
 };
 
-const welcomeMessage = (): Message => ({
-  id: "greet-1",
-  sender: "bot",
-  text: "Hi there! I'm **Nimo Bot**, your AI Assistant. Pick a question below and I'll help you.",
-});
-
 const CONTACT_STORAGE_KEY = "nimobot_contact_details";
-// Persists the FAQ topic/category the visitor last explored. Used purely as
-// a soft memory of intent — it never forces a navigation on its own.
 const FAQ_TOPIC_STORAGE_KEY = "nimobot_selected_faq_topic";
-
-// Renders changed-bot.mp4 with its black background keyed out to real
-// transparency (alpha=0), so only the bot itself is visible — no circle,
-// no card, no background of any kind, on top of any page.
-const LAUNCHER_SIZE = 84; // CSS px
+const LAUNCHER_SIZE = 84;
 
 function LauncherBotVideo({ onClick }: { onClick: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -2212,8 +1044,6 @@ function LauncherBotVideo({ onClick }: { onClick: () => void }) {
 
     let active = true;
 
-    // Soft luminance-based key: fully transparent below LOW, fully opaque
-    // above HIGH, smooth ramp in between (avoids a harsh cut-out edge).
     const LOW = 12;
     const HIGH = 42;
 
@@ -2280,7 +1110,6 @@ function LauncherBotVideo({ onClick }: { onClick: () => void }) {
   );
 }
 
-// Nimo Bot Profile Image Component for the header
 function NimoBotProfile() {
   return (
     <div className="cw-nimo-profile">
@@ -2289,6 +1118,73 @@ function NimoBotProfile() {
         alt="Nimo Bot"
         className="cw-nimo-profile-img"
       />
+    </div>
+  );
+}
+
+function LanguageDropdown({
+  currentLanguage,
+  onSelect,
+  ts,
+}: {
+  currentLanguage: string;
+  onSelect: (code: string) => void;
+  ts: (key: keyof Translations) => string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);
+
+  return (
+    <div className="cw-language-dropdown" ref={dropdownRef}>
+      <button
+        className="cw-language-toggle"
+        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+        aria-label={ts("changeLanguageLabel")}
+        title={ts("changeLanguageLabel")}
+      >
+        <Globe size={14} />
+        <span className="cw-language-toggle-label">
+          {currentLang?.native || currentLang?.label || "EN"}
+        </span>
+        <ChevronDown size={10} />
+      </button>
+      {isOpen && (
+        <div className="cw-language-dropdown-menu">
+          {LANGUAGES.map((lang) => (
+            <button
+              key={lang.code}
+              className={`cw-language-dropdown-item ${lang.code === currentLanguage ? "is-active" : ""}`}
+              onClick={() => {
+                onSelect(lang.code);
+                setIsOpen(false);
+              }}
+              type="button"
+            >
+              <span className="cw-language-dropdown-name">{lang.label}</span>
+              <span className="cw-language-dropdown-native">{lang.native}</span>
+              {lang.code === currentLanguage && (
+                <Check size={14} className="cw-language-dropdown-check" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2303,6 +1199,8 @@ function ChatWidgetInner() {
     handleChange: handleChatbotChange,
     askQuestion,
     resetForm: resetChatbotForm,
+    changeLanguage,
+    selectedLanguage,
   } = useChatbot();
   const {
     handleChange: handleWebsiteUserChange,
@@ -2347,7 +1245,8 @@ function ChatWidgetInner() {
   const isEmbedded =
     typeof window !== "undefined" && window.self !== window.top;
   const [isOpen, setIsOpen] = useState(isEmbedded);
-  const [messages, setMessages] = useState<Message[]>([welcomeMessage()]);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [flowStep, setFlowStep] = useState<FlowStep>("faq-list");
@@ -2388,13 +1287,58 @@ function ChatWidgetInner() {
   const conversationEndedNotifiedRef = useRef(false);
   const [satisfactionStage, setSatisfactionStage] =
     useState<SatisfactionStage>(null);
-  // True whenever there's a mentor conversation that isn't CLOSED. This is
-  // only ever used to *offer* a resume path — it never forces navigation.
   const [hasActiveConversation, setHasActiveConversation] = useState(false);
-
-  // Local validation errors for mentor form and query form
   const [localValidationErrors, setLocalValidationErrors] =
     useState<ValidationErrors>({});
+
+  // Helper to get current language translations
+  const t = useCallback(
+    (key: keyof Translations): any => {
+      const translate = getTranslation(selectedLanguage, key);
+      return translate;
+    },
+    [selectedLanguage],
+  );
+
+  // Helper to get string translation (not function)
+  const ts = useCallback(
+    (key: keyof Translations): string => {
+      const translate = getTranslation(selectedLanguage, key);
+      return translate as string;
+    },
+    [selectedLanguage],
+  );
+
+  // Check for saved language preference
+  useEffect(() => {
+    try {
+      const savedLang = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (savedLang && LANGUAGES.some((l) => l.code === savedLang)) {
+        changeLanguage(savedLang);
+        setShowLanguageSelector(false);
+        const msg = (
+          translations[savedLang as SupportedLanguage] || translations.en
+        ).welcomeMessage;
+        setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
+      }
+    } catch (err) {}
+  }, []);
+
+  // Handle language selection
+  const handleLanguageSelect = useCallback(
+    (languageCode: string) => {
+      changeLanguage(languageCode);
+      setShowLanguageSelector(false);
+      try {
+        window.localStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
+      } catch (err) {}
+      const msg =
+        translations[languageCode as SupportedLanguage]?.welcomeMessage ||
+        translations.en.welcomeMessage;
+      setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
+    },
+    [changeLanguage],
+  );
 
   useEffect(() => {
     try {
@@ -2417,10 +1361,6 @@ function ChatWidgetInner() {
     } catch (err) {}
   }, []);
 
-  // Track whether an active conversation exists, WITHOUT auto-navigating.
-  // Previously this effect jumped the user straight into mentor-chat as soon
-  // as conversations loaded — that's the "buggy" forced behavior. Now it
-  // just keeps state up to date so the hub can *offer* a resume option.
   useEffect(() => {
     if (!conversations || conversations.length === 0) {
       setHasActiveConversation(false);
@@ -2454,10 +1394,8 @@ function ChatWidgetInner() {
       setConversationEnded(true);
       setHasActiveConversation(false);
       setSatisfactionStage("ask");
-      pushMessage("bot", "This conversation has been ended by the mentor.");
-      simulateTyping(
-        "Was everything sorted out? Let me know if you're all set, or raise a query if something's still unresolved.",
-      );
+      pushMessage("bot", ts("conversationEnded"));
+      simulateTyping(ts("wasHelpful"));
     }
   }, [selectedConversation?.status, flowStep]);
 
@@ -2527,10 +1465,7 @@ function ChatWidgetInner() {
           setIsTyping(false);
         } else {
           setIsTyping(false);
-          pushMessage(
-            "bot",
-            "Hmm, I couldn't save your details just now. Please try again.",
-          );
+          pushMessage("bot", ts("saveError"));
           setMentorFormStep("email");
           setDraft("");
           setFlowStep("mentor-form");
@@ -2540,10 +1475,7 @@ function ChatWidgetInner() {
         if (c) return;
         setIsSavingContact(false);
         setIsTyping(false);
-        pushMessage(
-          "bot",
-          "Something went wrong saving your details. Please try again.",
-        );
+        pushMessage("bot", ts("saveErrorRetry"));
         setMentorFormStep("email");
         setDraft("");
         setFlowStep("mentor-form");
@@ -2567,10 +1499,10 @@ function ChatWidgetInner() {
     try {
       window.localStorage.setItem(CONTACT_STORAGE_KEY, JSON.stringify(updated));
     } catch (err) {}
-    pushMessage(
-      "bot",
-      `Thanks, **${contact.name}**! I've saved your details.\n\nHow would you like to proceed?`,
+    const thanksMsg = (t("thanksSaved") as (name: string) => string)(
+      contact.name,
     );
+    pushMessage("bot", thanksMsg);
     setFlowStep("mentor-options");
     setWaitingForEmployeeId(false);
     hasSavedContact.current = false;
@@ -2586,21 +1518,14 @@ function ChatWidgetInner() {
         if (ok) {
           pushMessage(
             "bot",
-            `Your query has been registered!\n\nTicket: **TKT-${Date.now().toString(36).toUpperCase()}**`,
+            `${ts("queryRegistered")}\n\nTicket: **TKT-${Date.now().toString(36).toUpperCase()}**`,
           );
           setSelectedQueryCategory(null);
           setFlowStep("mentor-options");
-        } else
-          pushMessage(
-            "bot",
-            "I couldn't submit your query — please try again.",
-          );
+        } else pushMessage("bot", ts("querySubmitError"));
       } catch (err) {
         if (c) return;
-        pushMessage(
-          "bot",
-          "Something went wrong submitting your query. Please try again.",
-        );
+        pushMessage("bot", ts("querySubmitErrorRetry"));
       }
     })();
     return () => {
@@ -2613,16 +1538,14 @@ function ChatWidgetInner() {
   const handleNameInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
-      // Prevent invalid characters from being typed
       const filtered = value.replace(/[^A-Za-z\s'-]/g, "");
       setDraft(filtered);
       if (formError) setFormError(null);
 
-      // Real-time validation
       if (filtered.trim().length > 0 && filtered.trim().length < 3) {
         setLocalValidationErrors((prev) => ({
           ...prev,
-          name: "Please enter your full name (minimum 3 characters).",
+          name: ts("invalidName"),
         }));
       } else if (filtered.trim().length > 0 && !isValidName(filtered)) {
         setLocalValidationErrors((prev) => ({
@@ -2636,29 +1559,21 @@ function ChatWidgetInner() {
         });
       }
     },
-    [formError],
+    [formError, ts],
   );
 
   const handleMobileInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
-      // Allow only digits
       const digits = value.replace(/\D/g, "");
-      // Limit to 15 digits
       const limited = digits.slice(0, 15);
       setDraft(limited);
       if (formError) setFormError(null);
 
-      // Real-time validation
       if (limited.length > 0 && limited.length < 10) {
         setLocalValidationErrors((prev) => ({
           ...prev,
-          mobile: "Please enter a valid mobile number (10-15 digits).",
-        }));
-      } else if (limited.length > 15) {
-        setLocalValidationErrors((prev) => ({
-          ...prev,
-          mobile: "Mobile number cannot exceed 15 digits.",
+          mobile: ts("invalidMobile"),
         }));
       } else {
         setLocalValidationErrors((prev) => {
@@ -2667,7 +1582,7 @@ function ChatWidgetInner() {
         });
       }
     },
-    [formError],
+    [formError, ts],
   );
 
   const handleEmailInput = useCallback(
@@ -2676,11 +1591,10 @@ function ChatWidgetInner() {
       setDraft(value);
       if (formError) setFormError(null);
 
-      // Real-time validation
       if (value.trim().length > 0 && !isValidEmail(value)) {
         setLocalValidationErrors((prev) => ({
           ...prev,
-          email: "Please enter a valid email address.",
+          email: ts("invalidEmail"),
         }));
       } else {
         setLocalValidationErrors((prev) => {
@@ -2689,7 +1603,7 @@ function ChatWidgetInner() {
         });
       }
     },
-    [formError],
+    [formError, ts],
   );
 
   const handleChatMessageInput = useCallback(
@@ -2697,10 +1611,7 @@ function ChatWidgetInner() {
       const value = e.target.value;
       handleChatbotChange(e);
 
-      // Real-time validation for chat message
-      if (value.trim().length === 0) {
-        // Don't show error for empty input while typing
-      } else if (value.trim().length > 1000) {
+      if (value.trim().length > 1000) {
         setLocalValidationErrors((prev) => ({
           ...prev,
           message: "Message cannot exceed 1000 characters.",
@@ -2720,7 +1631,6 @@ function ChatWidgetInner() {
       const value = e.target.value;
       handleMentorMessageChange(e);
 
-      // Real-time validation for mentor message
       if (value.trim().length > 1000) {
         setLocalValidationErrors((prev) => ({
           ...prev,
@@ -2743,7 +1653,7 @@ function ChatWidgetInner() {
     let isValid = true;
 
     if (!requestQuery.category) {
-      errors.category = "Please select a category for your query.";
+      errors.category = ts("selectCategoryError");
       isValid = false;
     }
 
@@ -2751,7 +1661,7 @@ function ChatWidgetInner() {
       !requestQuery.query_title ||
       !isValidQueryTitle(requestQuery.query_title)
     ) {
-      errors.query_title = "Please enter a query title (minimum 5 characters).";
+      errors.query_title = ts("queryTitleError");
       isValid = false;
     }
 
@@ -2759,8 +1669,7 @@ function ChatWidgetInner() {
       !requestQuery.query_description ||
       !isValidQueryDescription(requestQuery.query_description)
     ) {
-      errors.query_description =
-        "Please describe your issue in at least 10 characters.";
+      errors.query_description = ts("queryDescriptionError");
       isValid = false;
     }
 
@@ -2770,6 +1679,7 @@ function ChatWidgetInner() {
     requestQuery.category,
     requestQuery.query_title,
     requestQuery.query_description,
+    ts,
   ]);
 
   const handleStart = useCallback(() => {
@@ -2810,7 +1720,10 @@ function ChatWidgetInner() {
     resetMentorConversation();
     resetMentorMessage();
     setSelectedExpertCategory(null);
-    setMessages([welcomeMessage()]);
+    const msg = (
+      translations[selectedLanguage as SupportedLanguage] || translations.en
+    ).welcomeMessage;
+    setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
   }, [
     flowStep,
     selectedConversation,
@@ -2820,10 +1733,9 @@ function ChatWidgetInner() {
     resetRequestQueryForm,
     resetMentorConversation,
     resetMentorMessage,
+    selectedLanguage,
   ]);
 
-  // Lets the visitor jump straight to the hub (or start over, if no contact
-  // saved yet) from almost anywhere — the "switch mode" affordance.
   const handleGoHome = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setIsTyping(false);
@@ -2835,8 +1747,8 @@ function ChatWidgetInner() {
     setFormError(null);
     setLocalValidationErrors({});
     if (savedContact) {
-      pushMessage("user", "Switch");
-      simulateTyping("Sure — how would you like to proceed?");
+      pushMessage("user", ts("switch_"));
+      simulateTyping(ts("sureHowToProceed"));
       setFlowStep("mentor-options");
     } else {
       handleStart();
@@ -2849,6 +1761,7 @@ function ChatWidgetInner() {
     pushMessage,
     simulateTyping,
     handleStart,
+    ts,
   ]);
 
   const handleBack = useCallback(() => {
@@ -2860,38 +1773,36 @@ function ChatWidgetInner() {
       setFlowStep("faq-list");
       setSelectedFAQ(null);
       setSelectedCategory(null);
-      pushMessage("user", "Back");
-      simulateTyping("Here are the FAQ questions again:");
+      pushMessage("user", ts("back"));
+      simulateTyping(ts("hereAreFAQAgain"));
     } else if (flowStep === "faq-questions") {
       setFlowStep("faq-categories");
       setSelectedCategory(null);
       setSelectedQuestion(null);
-      pushMessage("user", "Back");
-      simulateTyping("Here are the categories again:");
+      pushMessage("user", ts("back"));
+      simulateTyping(ts("hereAreCategoriesAgain"));
     } else if (flowStep === "query-category") {
       resetRequestQueryForm();
       setSelectedQueryCategory(null);
       setFlowStep("mentor-options");
-      pushMessage("user", "Back");
-      simulateTyping("How would you like to proceed?");
+      pushMessage("user", ts("back"));
+      simulateTyping(ts("howToProceed"));
     } else if (flowStep === "query-form") {
       setFlowStep(
         expertCategories.length > 0 ? "query-category" : "mentor-options",
       );
-      pushMessage("user", "Back");
+      pushMessage("user", ts("back"));
       simulateTyping(
-        expertCategories.length > 0
-          ? "Which category is this about?"
-          : "How would you like to proceed?",
+        expertCategories.length > 0 ? ts("whichCategory") : ts("howToProceed"),
       );
     } else if (flowStep === "mentor-resume-choice") {
       setFlowStep("mentor-options");
-      pushMessage("user", "Back");
-      simulateTyping("How would you like to proceed?");
+      pushMessage("user", ts("back"));
+      simulateTyping(ts("howToProceed"));
     } else if (flowStep === "mentor-topics") {
       setFlowStep("mentor-options");
-      pushMessage("user", "Back");
-      simulateTyping("How would you like to proceed?");
+      pushMessage("user", ts("back"));
+      simulateTyping(ts("howToProceed"));
     } else if (flowStep === "mentor-chat") {
       if (selectedConversation?.conversation_generated_id)
         leaveRoom(selectedConversation.conversation_generated_id);
@@ -2903,8 +1814,8 @@ function ChatWidgetInner() {
       setAutoSelectedExpert(null);
       setHasActiveConversation(false);
       setFlowStep("mentor-options");
-      pushMessage("user", "Back");
-      simulateTyping("How would you like to proceed?");
+      pushMessage("user", ts("back"));
+      simulateTyping(ts("howToProceed"));
     } else if (
       flowStep === "mentor-form" ||
       flowStep === "mentor-options" ||
@@ -2923,6 +1834,7 @@ function ChatWidgetInner() {
     handleStart,
     resetRequestQueryForm,
     expertCategories.length,
+    ts,
   ]);
 
   const handleFaqSelect = useCallback(
@@ -2933,10 +1845,10 @@ function ChatWidgetInner() {
       setFlowStep("faq-categories");
       pushMessage("user", faq.faq_default_question);
       (faq.categories || []).length > 0
-        ? simulateTyping("Here are the categories:")
-        : simulateTyping("No categories yet.");
+        ? simulateTyping(ts("hereAreCategories"))
+        : simulateTyping(ts("noCategoriesYet"));
     },
-    [pushMessage, simulateTyping],
+    [pushMessage, simulateTyping, ts],
   );
 
   const handleCategorySelect = useCallback(
@@ -2944,9 +1856,7 @@ function ChatWidgetInner() {
       setSelectedCategory(cat);
       setSelectedQuestion(null);
       setFlowStep("faq-questions");
-      pushMessage("user", cat.topic_name || "Category");
-      // Remember the topic the visitor is browsing — soft memory only,
-      // never forces navigation on its own.
+      pushMessage("user", cat.topic_name || ts("unknown"));
       try {
         window.localStorage.setItem(
           FAQ_TOPIC_STORAGE_KEY,
@@ -2957,10 +1867,10 @@ function ChatWidgetInner() {
         );
       } catch (err) {}
       (cat.questions || []).length > 0
-        ? simulateTyping("Here are the questions:")
-        : simulateTyping("No questions yet.");
+        ? simulateTyping(ts("hereAreQuestions"))
+        : simulateTyping(ts("noQuestionsYet"));
     },
-    [pushMessage, simulateTyping],
+    [pushMessage, simulateTyping, ts],
   );
 
   const handleQuestionSelect = useCallback(
@@ -2975,25 +1885,22 @@ function ChatWidgetInner() {
               .filter(Boolean)
               .join("\n\n"),
           )
-        : simulateTyping("No answer yet — contact support below.");
+        : simulateTyping(ts("noAnswerYet"));
     },
-    [pushMessage, simulateTyping],
+    [pushMessage, simulateTyping, ts],
   );
 
-  // "Can't find your answer?" — always routes to the hub once contact info
-  // is known. It no longer silently resumes an old mentor conversation;
-  // the hub is where that choice gets offered (see mentor-options render).
   const handleShowSatisfaction = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    pushMessage("user", "I need more help");
+    pushMessage("user", ts("iNeedMoreHelp"));
     if (savedContact) {
       setIsTyping(true);
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        pushMessage(
-          "bot",
-          `Welcome back, **${savedContact.name}**! How would you like to proceed?`,
+        const welcomeBackMsg = (t("welcomeBack") as (name: string) => string)(
+          savedContact.name,
         );
+        pushMessage("bot", welcomeBackMsg);
         setMentorForm(savedContact);
         setFlowStep("mentor-options");
       }, 550);
@@ -3015,7 +1922,7 @@ function ChatWidgetInner() {
       setDraft("");
       setFlowStep("mentor-form");
     }, 550);
-  }, [pushMessage, savedContact]);
+  }, [pushMessage, savedContact, ts, t]);
 
   const handleEditContact = useCallback(() => {
     setSavedContact(null);
@@ -3052,7 +1959,7 @@ function ChatWidgetInner() {
 
     if (mentorFormStep === "name") {
       if (!isValidName(text)) {
-        setFormError("Please enter your full name (minimum 3 characters).");
+        setFormError(ts("invalidName"));
         return;
       }
       setFormError(null);
@@ -3062,13 +1969,16 @@ function ChatWidgetInner() {
       setMentorForm((p) => ({ ...p, name: sanitizedName }));
       setMentorFormStep("mobile");
       setDraft("");
-      simulateTyping(`Nice to meet you, **${sanitizedName}**! Mobile number?`);
+      const niceToMeetMsg = (t("niceToMeet") as (name: string) => string)(
+        sanitizedName,
+      );
+      simulateTyping(niceToMeetMsg);
       return;
     }
 
     if (mentorFormStep === "mobile") {
       if (!isValidMobile(text)) {
-        setFormError("Please enter a valid mobile number.");
+        setFormError(ts("invalidMobile"));
         return;
       }
       setFormError(null);
@@ -3077,12 +1987,12 @@ function ChatWidgetInner() {
       setMentorForm((p) => ({ ...p, mobile: text }));
       setMentorFormStep("email");
       setDraft("");
-      simulateTyping("Email address?");
+      simulateTyping(ts("emailAddress"));
       return;
     }
 
     if (!isValidEmail(text)) {
-      setFormError("Please enter a valid email address.");
+      setFormError(ts("invalidEmail"));
       return;
     }
     setFormError(null);
@@ -3116,44 +2026,42 @@ function ChatWidgetInner() {
     pushMessage,
     simulateTyping,
     handleWebsiteUserChange,
+    ts,
+    t,
   ]);
 
   const handleChatWithBot = useCallback(() => {
     const c = savedContact ?? mentorForm;
-    pushMessage("user", "Chat with Nimo Bot");
-    simulateTyping(
-      `You're now chatting with Nimo Bot AI, **${c.name}**. Ask me anything.`,
+    pushMessage("user", ts("chatWithBot"));
+    const chatMsg = (t("youAreNowChatting") as (name: string) => string)(
+      c.name,
     );
+    simulateTyping(chatMsg);
     setFlowStep("live-chat");
-  }, [savedContact, mentorForm, pushMessage, simulateTyping]);
+  }, [savedContact, mentorForm, pushMessage, simulateTyping, ts, t]);
 
-  // "Talk to a Mentor" from the hub. If an active conversation already
-  // exists, we ask explicitly instead of assuming — this is the fix for
-  // the "feels buggy" auto-resume complaint.
   const handleShowMentorTopics = useCallback(async () => {
-    pushMessage("user", "Talk to a Mentor");
+    pushMessage("user", ts("talkToMentor"));
     if (
       hasActiveConversation &&
       selectedConversation &&
       selectedConversation.status !== "CLOSED"
     ) {
-      simulateTyping(
-        "You already have an ongoing conversation. Would you like to resume it or start a new topic?",
-      );
+      simulateTyping(ts("activeConversationPrompt"));
       setFlowStep("mentor-resume-choice");
       return;
     }
     try {
       const cats = await getExpertCategories();
       if (cats.length > 0) {
-        simulateTyping("Which topic would you like help with?");
+        simulateTyping(ts("pickTopic"));
         setFlowStep("mentor-topics");
       } else {
-        simulateTyping("No mentor categories available right now.");
+        simulateTyping(ts("noMentorCategories"));
         setFlowStep("mentor-options");
       }
     } catch (err) {
-      simulateTyping("Couldn't load mentor topics — please try again.");
+      simulateTyping(ts("couldntLoadTopics"));
       setFlowStep("mentor-options");
     }
   }, [
@@ -3162,35 +2070,32 @@ function ChatWidgetInner() {
     getExpertCategories,
     hasActiveConversation,
     selectedConversation,
+    ts,
   ]);
 
   const handleResumeConversation = useCallback(() => {
-    pushMessage("user", "Resume conversation");
-    simulateTyping("Resuming your conversation...");
+    pushMessage("user", ts("resumeConversation"));
+    simulateTyping(ts("resumingConversation"));
     setFlowStep("mentor-chat");
-  }, [pushMessage, simulateTyping]);
+  }, [pushMessage, simulateTyping, ts]);
 
   const handleStartNewMentorTopic = useCallback(async () => {
-    pushMessage("user", "Start a new topic");
+    pushMessage("user", ts("startNewTopic"));
     try {
       const cats = await getExpertCategories();
       if (cats.length > 0) {
-        simulateTyping("Which topic would you like help with?");
+        simulateTyping(ts("pickTopic"));
         setFlowStep("mentor-topics");
       } else {
-        simulateTyping("No mentor categories available right now.");
+        simulateTyping(ts("noMentorCategories"));
         setFlowStep("mentor-options");
       }
     } catch (err) {
-      simulateTyping("Couldn't load mentor topics — please try again.");
+      simulateTyping(ts("couldntLoadTopics"));
       setFlowStep("mentor-options");
     }
-  }, [pushMessage, simulateTyping, getExpertCategories]);
+  }, [pushMessage, simulateTyping, getExpertCategories, ts]);
 
-  // "Raise a Query" now asks for a category first (same category list used
-  // for mentors), then goes to the title/description form — mirroring the
-  // way mentors are matched by topic, and populating the new
-  // requestQuery.category field.
   const handleStartQueryForm = useCallback(() => {
     const c = savedContact ?? mentorForm;
     handleRequestQueryChange({
@@ -3213,19 +2118,19 @@ function ChatWidgetInner() {
     } as ChangeEvent<HTMLInputElement>);
     setSelectedQueryCategory(null);
     setLocalValidationErrors({});
-    pushMessage("user", "Raise a Query");
+    pushMessage("user", ts("raiseQuery"));
     (async () => {
       try {
         const cats = await getExpertCategories();
         if (cats.length > 0) {
-          simulateTyping("Which category best describes your query?");
+          simulateTyping(ts("whichCategoryQuery"));
           setFlowStep("query-category");
         } else {
-          simulateTyping("Give me a title and details.");
+          simulateTyping(ts("giveMeTitleDetails"));
           setFlowStep("query-form");
         }
       } catch (err) {
-        simulateTyping("Give me a title and details.");
+        simulateTyping(ts("giveMeTitleDetails"));
         setFlowStep("query-form");
       }
     })();
@@ -3236,6 +2141,7 @@ function ChatWidgetInner() {
     simulateTyping,
     handleRequestQueryChange,
     getExpertCategories,
+    ts,
   ]);
 
   const handleQueryCategorySelect = useCallback(
@@ -3249,10 +2155,10 @@ function ChatWidgetInner() {
         return rest;
       });
       pushMessage("user", cat.name);
-      simulateTyping("Got it. Now give me a title and details.");
+      simulateTyping(ts("gotItTitleDetails"));
       setFlowStep("query-form");
     },
-    [handleRequestQueryChange, pushMessage, simulateTyping],
+    [handleRequestQueryChange, pushMessage, simulateTyping, ts],
   );
 
   const handleSkipQueryCategory = useCallback(() => {
@@ -3264,22 +2170,20 @@ function ChatWidgetInner() {
       const { category, ...rest } = prev;
       return rest;
     });
-    pushMessage("user", "Not sure — skip category");
-    simulateTyping("No problem. Give me a title and details.");
+    pushMessage("user", ts("notSureSkip"));
+    simulateTyping(ts("noProblemTitleDetails"));
     setFlowStep("query-form");
-  }, [handleRequestQueryChange, pushMessage, simulateTyping]);
+  }, [handleRequestQueryChange, pushMessage, simulateTyping, ts]);
 
   const handleRaiseQueryFromEnd = useCallback(() => {
     handleStartQueryForm();
   }, [handleStartQueryForm]);
 
   const handleConversationSatisfied = useCallback(() => {
-    pushMessage("user", "All good, thanks!");
-    simulateTyping(
-      "Wonderful! Thank you for chatting with Nimo Bot today — it was a pleasure helping you. 🎉",
-    );
+    pushMessage("user", ts("allGoodThanks"));
+    simulateTyping(ts("wonderfulThanks"));
     setSatisfactionStage("closed");
-  }, [pushMessage, simulateTyping]);
+  }, [pushMessage, simulateTyping, ts]);
 
   const handleExitChat = useCallback(() => {
     setIsOpen(false);
@@ -3289,24 +2193,19 @@ function ChatWidgetInner() {
     handleStart();
   }, [handleStart]);
 
-  // Explicit "End Chat" from the hub — lets the visitor close things out on
-  // their own terms rather than just abandoning the widget mid-flow.
   const handleEndChat = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    pushMessage("user", "End Chat");
+    pushMessage("user", ts("endChatConfirm"));
     setIsTyping(true);
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      pushMessage(
-        "bot",
-        "Thanks for chatting with Nimo Bot today! Have a great day. 👋",
-      );
+      pushMessage("bot", ts("haveGreatDay"));
       typingTimeoutRef.current = setTimeout(() => {
         handleStart();
         setIsOpen(false);
       }, 1100);
     }, 550);
-  }, [pushMessage, handleStart]);
+  }, [pushMessage, handleStart, ts]);
 
   const handleMentorCategorySelect = useCallback(
     async (cat: ExpertCategory) => {
@@ -3324,10 +2223,13 @@ function ChatWidgetInner() {
         if (experts.length > 0) {
           const firstExpert = experts[0];
           setAutoSelectedExpert(firstExpert);
-          pushMessage(
-            "bot",
-            `Connecting you with **${firstExpert.name}**, your mentor for **${cat.name}**...`,
-          );
+          const connectingMsg = (
+            t("connectingYouWith") as (
+              expert: string,
+              category: string,
+            ) => string
+          )(firstExpert.name, cat.name);
+          pushMessage("bot", connectingMsg);
           const c = savedContact ?? mentorForm;
           const success = await createConversation({
             visitor_name: c.name,
@@ -3338,31 +2240,28 @@ function ChatWidgetInner() {
             category_name: cat.name ?? "",
           });
           if (success) {
-            pushMessage(
-              "bot",
-              `You're now talking to **${firstExpert.name}**. Say hello! 👋`,
-            );
+            const talkingMsg = (
+              t("nowTalkingTo") as (expert: string) => string
+            )(firstExpert.name);
+            pushMessage("bot", talkingMsg);
             setHasActiveConversation(true);
             setFlowStep("mentor-chat");
           } else {
-            pushMessage(
-              "bot",
-              `Couldn't start the conversation with **${firstExpert.name}** — please try again.`,
-            );
+            const errorMsg = (
+              t("couldntStartConversation") as (expert: string) => string
+            )(firstExpert.name);
+            pushMessage("bot", errorMsg);
           }
         } else {
-          pushMessage(
-            "bot",
-            `No mentors available for **${cat.name}**. Try another.`,
-          );
+          const noMentorMsg = (
+            t("noMentorsAvailable") as (category: string) => string
+          )(cat.name);
+          pushMessage("bot", noMentorMsg);
           setFlowStep("mentor-topics");
         }
       } catch (err) {
         setIsTyping(false);
-        pushMessage(
-          "bot",
-          "Something went wrong connecting you to a mentor. Please try again.",
-        );
+        pushMessage("bot", ts("connectionError"));
       } finally {
         setConnectingCategoryId(null);
       }
@@ -3375,6 +2274,8 @@ function ChatWidgetInner() {
       createConversation,
       getExpertsByCategory,
       getExpertsByCategoryId,
+      ts,
+      t,
     ],
   );
 
@@ -3427,27 +2328,27 @@ function ChatWidgetInner() {
     flowStep === "faq-list"
       ? "Nimo Bot"
       : flowStep === "faq-categories"
-        ? (selectedFAQ?.faq_default_question ?? "Categories")
+        ? (selectedFAQ?.faq_default_question ?? ts("categories"))
         : flowStep === "faq-questions"
-          ? (selectedCategory?.topic_name ?? "Questions")
+          ? (selectedCategory?.topic_name ?? ts("questions"))
           : flowStep === "mentor-form"
-            ? "Contact Support"
+            ? ts("contactSupport")
             : flowStep === "query-category"
-              ? "Raise a Query"
+              ? ts("raiseAQuery")
               : flowStep === "query-form"
-                ? "Raise a Query"
+                ? ts("raiseAQuery")
                 : flowStep === "live-chat"
-                  ? "Chat with Nimo Bot"
+                  ? ts("chatWithBot")
                   : flowStep === "mentor-topics"
-                    ? "Talk to a Mentor"
+                    ? ts("talkToMentor")
                     : flowStep === "mentor-resume-choice"
-                      ? "Talk to a Mentor"
+                      ? ts("talkToMentor")
                       : flowStep === "mentor-options"
-                        ? "How can we help?"
+                        ? ts("howCanWeHelp")
                         : flowStep === "mentor-chat"
                           ? (autoSelectedExpert?.name ??
                             selectedConversation?.category_name ??
-                            "Mentor Chat")
+                            ts("mentorChat"))
                           : "Next Steps";
   const displayContact = savedContact ?? mentorForm;
 
@@ -3482,12 +2383,14 @@ function ChatWidgetInner() {
         </span>
         <span className="cw-resume-banner-text">
           <span className="cw-resume-banner-title">
-            You have an ongoing conversation
+            {ts("youHaveActiveConversation")}
           </span>
           <span className="cw-resume-banner-sub">
             {selectedConversation.category_name
-              ? `About ${selectedConversation.category_name} — tap to resume`
-              : "Tap to resume"}
+              ? (t("aboutTopic") as (topic: string) => string)(
+                  selectedConversation.category_name,
+                )
+              : ts("tapToResume")}
           </span>
         </span>
         <span className="cw-resume-banner-arrow">
@@ -3506,7 +2409,7 @@ function ChatWidgetInner() {
             <span className="cw-section-icon">
               <MessageSquare size={15} />
             </span>
-            Pick a question to get started
+            {ts("pickQuestion")}
           </div>
           {faqsLoading && (
             <div className="cw-skeleton-list">
@@ -3543,8 +2446,8 @@ function ChatWidgetInner() {
           >
             <MessageSquareWarning size={16} className="cw-help-btn-icon" />
             <span className="cw-help-btn-text">
-              <span>Can&apos;t find your answer?</span>
-              <span className="cw-help-btn-sub">Talk to our support team</span>
+              <span>{ts("cantFindAnswer")}</span>
+              <span className="cw-help-btn-sub">{ts("talkToSupportTeam")}</span>
             </span>
           </button>
         </div>
@@ -3557,10 +2460,10 @@ function ChatWidgetInner() {
             <span className="cw-section-icon">
               <Folder size={15} />
             </span>
-            Categories
+            {ts("categories")}
           </div>
           {cats.length === 0 ? (
-            <div className="cw-empty-state">No categories yet.</div>
+            <div className="cw-empty-state">{ts("noCategoriesYet")}</div>
           ) : (
             <div className="cw-faqlist-items">
               {cats.map((cat, i) => (
@@ -3572,7 +2475,7 @@ function ChatWidgetInner() {
                   type="button"
                 >
                   <Folder size={14} />
-                  <span>{cat.topic_name || "Unknown"}</span>
+                  <span>{cat.topic_name || ts("unknown")}</span>
                 </button>
               ))}
             </div>
@@ -3584,7 +2487,7 @@ function ChatWidgetInner() {
           >
             <MessageSquareWarning size={16} className="cw-help-btn-icon" />
             <span className="cw-help-btn-text">
-              <span>Need more help?</span>
+              <span>{ts("needMoreHelp")}</span>
               <span className="cw-help-btn-sub">Contact our support team</span>
             </span>
           </button>
@@ -3599,10 +2502,10 @@ function ChatWidgetInner() {
             <span className="cw-section-icon">
               <FileText size={15} />
             </span>
-            {selectedCategory.topic_name || "Questions"}
+            {selectedCategory.topic_name || ts("questions")}
           </div>
           {questions.length === 0 ? (
-            <div className="cw-empty-state">No questions yet.</div>
+            <div className="cw-empty-state">{ts("noQuestionsYet")}</div>
           ) : (
             <div className="cw-faqlist-items">
               {questions.map((q, i) => (
@@ -3634,7 +2537,7 @@ function ChatWidgetInner() {
                   ))}
                 </div>
               ) : (
-                <p className="cw-answer-empty">No answer available yet.</p>
+                <p className="cw-answer-empty">{ts("noAnswerYet")}</p>
               )}
             </div>
           )}
@@ -3645,7 +2548,7 @@ function ChatWidgetInner() {
           >
             <MessageSquareWarning size={16} className="cw-help-btn-icon" />
             <span className="cw-help-btn-text">
-              <span>Need more help?</span>
+              <span>{ts("needMoreHelp")}</span>
               <span className="cw-help-btn-sub">Contact our support team</span>
             </span>
           </button>
@@ -3664,7 +2567,7 @@ function ChatWidgetInner() {
               <span className="cw-progress-dot">
                 {i < ci ? <Check size={12} /> : s.icon}
               </span>
-              <span className="cw-progress-label">{s.label}</span>
+              <span className="cw-progress-label">{ts(s.labelKey)}</span>
               {i < MENTOR_STEPS.length - 1 && (
                 <span className="cw-progress-line" />
               )}
@@ -3673,7 +2576,7 @@ function ChatWidgetInner() {
           {isSavingContact && (
             <div className="cw-saving-indicator">
               <Loader2 size={12} className="cw-spin" />
-              Saving...
+              {ts("saving")}
             </div>
           )}
         </div>
@@ -3701,7 +2604,7 @@ function ChatWidgetInner() {
               type="button"
             >
               <Pencil size={11} />
-              Not you? Update details
+              {ts("notYou")}
             </button>
           </div>
           {renderResumeBanner("standalone")}
@@ -3714,10 +2617,8 @@ function ChatWidgetInner() {
               <Bot size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">Chat with Nimo Bot</span>
-              <span className="cw-option-desc">
-                Get instant answers from Nimo Bot AI
-              </span>
+              <span className="cw-option-label">{ts("chatWithBot")}</span>
+              <span className="cw-option-desc">{ts("chatWithBotDesc")}</span>
             </div>
           </button>
           <button
@@ -3729,10 +2630,8 @@ function ChatWidgetInner() {
               <Users size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">Talk to a Mentor</span>
-              <span className="cw-option-desc">
-                Get connected live with a topic expert
-              </span>
+              <span className="cw-option-label">{ts("talkToMentor")}</span>
+              <span className="cw-option-desc">{ts("talkToMentorDesc")}</span>
             </div>
           </button>
           <button
@@ -3744,10 +2643,8 @@ function ChatWidgetInner() {
               <FileText size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">Raise a Query</span>
-              <span className="cw-option-desc">
-                Log a ticket for our team to track
-              </span>
+              <span className="cw-option-label">{ts("raiseQuery")}</span>
+              <span className="cw-option-desc">{ts("raiseQueryDesc")}</span>
             </div>
           </button>
           <button
@@ -3759,10 +2656,8 @@ function ChatWidgetInner() {
               <DoorOpen size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">End Chat</span>
-              <span className="cw-option-desc">
-                Close this conversation for now
-              </span>
+              <span className="cw-option-label">{ts("endChat")}</span>
+              <span className="cw-option-desc">{ts("endChatDesc")}</span>
             </div>
           </button>
         </div>
@@ -3779,12 +2674,15 @@ function ChatWidgetInner() {
               <MessageSquare size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">Resume Conversation</span>
+              <span className="cw-option-label">
+                {ts("resumeConversation")}
+              </span>
               <span className="cw-option-desc">
-                Continue chatting with{" "}
-                {autoSelectedExpert?.name ??
-                  selectedConversation?.category_name ??
-                  "your mentor"}
+                {(t("resumeConversationDesc") as (name: string) => string)(
+                  autoSelectedExpert?.name ??
+                    selectedConversation?.category_name ??
+                    "your mentor",
+                )}
               </span>
             </div>
           </button>
@@ -3797,10 +2695,8 @@ function ChatWidgetInner() {
               <Users size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">Start a New Topic</span>
-              <span className="cw-option-desc">
-                Talk to a different mentor about something else
-              </span>
+              <span className="cw-option-label">{ts("startNewTopic")}</span>
+              <span className="cw-option-desc">{ts("startNewTopicDesc")}</span>
             </div>
           </button>
         </div>
@@ -3812,7 +2708,7 @@ function ChatWidgetInner() {
             <span className="cw-section-icon">
               <ClipboardList size={15} />
             </span>
-            Which category is this about?
+            {ts("whichCategoryQuery")}
           </div>
           {expertsLoading && (
             <div className="cw-skeleton-list">
@@ -3847,7 +2743,7 @@ function ChatWidgetInner() {
             onClick={handleSkipQueryCategory}
             type="button"
           >
-            Skip — I&apos;m not sure which category
+            {ts("skipCategory")}
           </button>
         </div>
       );
@@ -3873,7 +2769,7 @@ function ChatWidgetInner() {
                 className="cw-query-category-change"
                 onClick={() => setFlowStep("query-category")}
               >
-                Change
+                {ts("change")}
               </button>
             </div>
           )}
@@ -3881,24 +2777,22 @@ function ChatWidgetInner() {
             <div className="cw-query-field">
               <label className="cw-query-label">
                 <ClipboardList size={13} />
-                Query title
+                {ts("queryTitle")}
               </label>
               <input
                 className={`cw-query-input ${requestQueryErrors.query_title || localValidationErrors.query_title ? "has-error" : ""}`}
                 name="query_title"
-                placeholder="e.g. Unable to submit assignment"
+                placeholder={ts("queryTitlePlaceholder")}
                 value={requestQuery.query_title}
                 onChange={(e) => {
                   handleRequestQueryChange(e);
-                  // Real-time validation
                   if (
                     e.target.value.trim().length > 0 &&
                     e.target.value.trim().length < 5
                   ) {
                     setLocalValidationErrors((prev) => ({
                       ...prev,
-                      query_title:
-                        "Please enter a query title (minimum 5 characters).",
+                      query_title: ts("queryTitleError"),
                     }));
                   } else {
                     setLocalValidationErrors((prev) => {
@@ -3922,24 +2816,22 @@ function ChatWidgetInner() {
             <div className="cw-query-field">
               <label className="cw-query-label">
                 <FileText size={13} />
-                Describe the issue
+                {ts("describeIssue")}
               </label>
               <textarea
                 className={`cw-query-textarea ${requestQueryErrors.query_description || localValidationErrors.query_description ? "has-error" : ""}`}
                 name="query_description"
-                placeholder="Tell us what happened..."
+                placeholder={ts("describeIssuePlaceholder")}
                 value={requestQuery.query_description}
                 onChange={(e) => {
                   handleRequestQueryChange(e);
-                  // Real-time validation
                   if (
                     e.target.value.trim().length > 0 &&
                     e.target.value.trim().length < 10
                   ) {
                     setLocalValidationErrors((prev) => ({
                       ...prev,
-                      query_description:
-                        "Please describe your issue in at least 10 characters.",
+                      query_description: ts("queryDescriptionError"),
                     }));
                   } else {
                     setLocalValidationErrors((prev) => {
@@ -3978,12 +2870,12 @@ function ChatWidgetInner() {
               {requestQueryLoading ? (
                 <>
                   <Loader2 size={15} className="cw-spin" />
-                  Submitting...
+                  {ts("submitting")}
                 </>
               ) : (
                 <>
                   <Send size={15} />
-                  Submit Query
+                  {ts("submitQuery")}
                 </>
               )}
             </button>
@@ -3997,7 +2889,7 @@ function ChatWidgetInner() {
             <span className="cw-section-icon">
               <Users size={15} />
             </span>
-            Pick a topic for your mentor
+            {ts("pickTopic")}
           </div>
           {expertsLoading && (
             <div className="cw-skeleton-list">
@@ -4007,9 +2899,7 @@ function ChatWidgetInner() {
             </div>
           )}
           {!expertsLoading && expertCategories.length === 0 && (
-            <div className="cw-empty-state">
-              No mentor categories available.
-            </div>
+            <div className="cw-empty-state">{ts("noMentorCategories")}</div>
           )}
           {!expertsLoading && expertCategories.length > 0 && (
             <div className="cw-categories-grid">
@@ -4036,7 +2926,7 @@ function ChatWidgetInner() {
                       {cat.name}
                       {isConnectingThis && (
                         <span className="cw-category-status">
-                          Connecting...
+                          {ts("connecting")}
                         </span>
                       )}
                     </span>
@@ -4059,382 +2949,451 @@ function ChatWidgetInner() {
     <div className="cw-root">
       {isOpen && (
         <div className="cw-panel" role="dialog" aria-label="Nimo Bot">
-          <div className="cw-header">
-            {flowStep !== "faq-list" && (
-              <button
-                className="cw-header-back-btn"
-                onClick={handleBack}
-                type="button"
-              >
-                <ArrowLeft size={18} />
-              </button>
-            )}
-            <div className="cw-header-icon">
-              <NimoBotProfile />
-            </div>
-            <div className="cw-header-meta">
-              <div className="cw-header-title">{headerTitle}</div>
-              <div className="cw-header-status">
-                <span
-                  className={`cw-status-dot ${flowStep === "mentor-chat" ? (selectedConversation?.status === "ACTIVE" ? "" : selectedConversation?.status === "CLOSED" ? "cw-status-dot--closed" : "cw-status-dot--waiting") : ""}`}
-                />
-                <span>
-                  {flowStep === "mentor-chat"
-                    ? selectedConversation?.status === "ACTIVE"
-                      ? "Mentor connected"
-                      : selectedConversation?.status === "CLOSED"
-                        ? "Closed"
-                        : "Waiting"
-                    : "Nimo Bot Online"}
-                </span>
-              </div>
-            </div>
-            {showHomeButton && (
-              <button
-                className="cw-header-home-btn"
-                onClick={handleGoHome}
-                type="button"
-                aria-label="Switch mode"
-                title="Switch mode"
-              >
-                <Home size={16} />
-              </button>
-            )}
-            <button
-              className="cw-close-btn"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className="cw-messages" aria-live="polite">
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
-              >
-                <div
-                  className={`cw-avatar ${m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"}`}
-                >
-                  {m.sender === "bot" ? <Bot size={13} /> : <User size={12} />}
+          {showLanguageSelector ? (
+            <>
+              <div className="cw-header">
+                <div className="cw-header-icon">
+                  <NimoBotProfile />
                 </div>
-                <div
-                  className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"}`}
-                >
-                  {m.sender === "bot" ? (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                    >
-                      {m.text}
-                    </ReactMarkdown>
-                  ) : (
-                    m.text
-                  )}
-                </div>
-              </div>
-            ))}
-            {flowStep === "live-chat" &&
-              chatbotMessages.map((cm, i) => (
-                <div
-                  key={`chat-${i}`}
-                  className={`cw-msg ${cm.role === "user" ? "cw-msg--user" : ""}`}
-                >
-                  <div
-                    className={`cw-avatar ${cm.role === "assistant" ? "cw-avatar--bot" : "cw-avatar--user"}`}
-                  >
-                    {cm.role === "assistant" ? (
-                      <Bot size={13} />
-                    ) : (
-                      <User size={12} />
-                    )}
+                <div className="cw-header-meta">
+                  <div className="cw-header-title">{ts("chooseLanguage")}</div>
+                  <div className="cw-header-status">
+                    <span className="cw-status-dot" />
+                    <span>{ts("choosePreferredLanguage")}</span>
                   </div>
-                  <div
-                    className={`cw-bubble ${cm.role === "assistant" ? "cw-bubble--bot" : "cw-bubble--user"}`}
-                  >
-                    {cm.role === "assistant" ? (
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight]}
+                </div>
+              </div>
+              <div className="cw-messages">
+                <div className="cw-language-selector">
+                  <div className="cw-language-header">
+                    <Globe size={32} className="cw-language-icon" />
+                    <h2 className="cw-language-title">
+                      {ts("selectYourLanguage")}
+                    </h2>
+                    <p className="cw-language-subtitle">
+                      {ts("choosePreferredLanguage")}
+                    </p>
+                  </div>
+                  <div className="cw-language-grid">
+                    {LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        className="cw-language-btn"
+                        onClick={() => handleLanguageSelect(lang.code)}
+                        type="button"
                       >
-                        {cm.content}
-                      </ReactMarkdown>
-                    ) : (
-                      cm.content
-                    )}
+                        <div className="cw-language-btn-content">
+                          <span className="cw-language-name">{lang.label}</span>
+                          <span className="cw-language-native">
+                            {lang.native}
+                          </span>
+                        </div>
+                        <ArrowLeft
+                          size={16}
+                          style={{ transform: "rotate(180deg)" }}
+                        />
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ))}
-            {flowStep === "mentor-chat" && (
-              <>
-                {conversationEnded && (
-                  <div className="cw-conversation-ended">
-                    <Check size={14} /> This conversation has ended
-                  </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="cw-header">
+                {flowStep !== "faq-list" && (
+                  <button
+                    className="cw-header-back-btn"
+                    onClick={handleBack}
+                    type="button"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
                 )}
-                {mentorMessages
-                  .filter(
-                    (mm, idx, self) =>
-                      idx ===
-                      self.findIndex(
-                        (m) =>
-                          m.message_generated_id === mm.message_generated_id,
-                      ),
-                  )
-                  .map((mm, i) => {
-                    const iv = mm.sender === "VISITOR";
-                    const lastIdx =
-                      mentorMessages.filter(
-                        (mm2, idx2, self2) =>
-                          idx2 ===
-                          self2.findIndex(
+                <div className="cw-header-icon">
+                  <NimoBotProfile />
+                </div>
+                <div className="cw-header-meta">
+                  <div className="cw-header-title">{headerTitle}</div>
+                  <div className="cw-header-status">
+                    <span
+                      className={`cw-status-dot ${flowStep === "mentor-chat" ? (selectedConversation?.status === "ACTIVE" ? "" : selectedConversation?.status === "CLOSED" ? "cw-status-dot--closed" : "cw-status-dot--waiting") : ""}`}
+                    />
+                    <span>
+                      {flowStep === "mentor-chat"
+                        ? selectedConversation?.status === "ACTIVE"
+                          ? ts("mentorConnected")
+                          : selectedConversation?.status === "CLOSED"
+                            ? ts("closed")
+                            : ts("waiting")
+                        : ts("nimoBotOnline")}
+                    </span>
+                  </div>
+                </div>
+                <div className="cw-header-actions">
+                  <LanguageDropdown
+                    currentLanguage={selectedLanguage || "en"}
+                    onSelect={handleLanguageSelect}
+                    ts={ts}
+                  />
+                  {showHomeButton && (
+                    <button
+                      className="cw-header-home-btn"
+                      onClick={handleGoHome}
+                      type="button"
+                      aria-label="Switch mode"
+                      title="Switch mode"
+                    >
+                      <Home size={16} />
+                    </button>
+                  )}
+                  <button
+                    className="cw-close-btn"
+                    onClick={() => setIsOpen(false)}
+                    type="button"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className="cw-messages" aria-live="polite">
+                {messages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
+                  >
+                    <div
+                      className={`cw-avatar ${m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"}`}
+                    >
+                      {m.sender === "bot" ? (
+                        <Bot size={13} />
+                      ) : (
+                        <User size={12} />
+                      )}
+                    </div>
+                    <div
+                      className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"}`}
+                    >
+                      {m.sender === "bot" ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                        >
+                          {m.text}
+                        </ReactMarkdown>
+                      ) : (
+                        m.text
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {flowStep === "live-chat" &&
+                  chatbotMessages.map((cm, i) => (
+                    <div
+                      key={`chat-${i}`}
+                      className={`cw-msg ${cm.role === "user" ? "cw-msg--user" : ""}`}
+                    >
+                      <div
+                        className={`cw-avatar ${cm.role === "assistant" ? "cw-avatar--bot" : "cw-avatar--user"}`}
+                      >
+                        {cm.role === "assistant" ? (
+                          <Bot size={13} />
+                        ) : (
+                          <User size={12} />
+                        )}
+                      </div>
+                      <div
+                        className={`cw-bubble ${cm.role === "assistant" ? "cw-bubble--bot" : "cw-bubble--user"}`}
+                      >
+                        {cm.role === "assistant" ? (
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                          >
+                            {cm.content}
+                          </ReactMarkdown>
+                        ) : (
+                          cm.content
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                {flowStep === "mentor-chat" && (
+                  <>
+                    {conversationEnded && (
+                      <div className="cw-conversation-ended">
+                        <Check size={14} /> {ts("conversationEnded")}
+                      </div>
+                    )}
+                    {mentorMessages
+                      .filter(
+                        (mm, idx, self) =>
+                          idx ===
+                          self.findIndex(
                             (m) =>
                               m.message_generated_id ===
-                              mm2.message_generated_id,
+                              mm.message_generated_id,
                           ),
-                      ).length - 1;
-                    const isLastVisitorMsg = iv && i === lastIdx;
-                    return (
-                      <div
-                        key={
-                          mm.message_generated_id
-                            ? `${mm.message_generated_id}-${i}`
-                            : `m-${i}`
-                        }
-                        className={`cw-msg ${iv ? "cw-msg--user" : ""}`}
-                      >
-                        <div
-                          className={`cw-avatar ${iv ? "cw-avatar--user" : "cw-avatar--bot"}`}
-                        >
-                          {iv ? <User size={12} /> : <Users size={13} />}
-                        </div>
-                        <div
-                          className={`cw-bubble ${iv ? "cw-bubble--user" : "cw-bubble--bot"}`}
-                        >
-                          {mm.message}
-                          {iv && isLastVisitorMsg && (
-                            <div className="cw-message-status">
-                              {mm.is_read ? (
-                                <CheckCheck
-                                  size={12}
-                                  className="cw-status-read"
-                                />
-                              ) : (
-                                <Check
-                                  size={12}
-                                  className="cw-status-pending"
-                                />
+                      )
+                      .map((mm, i) => {
+                        const iv = mm.sender === "VISITOR";
+                        const lastIdx =
+                          mentorMessages.filter(
+                            (mm2, idx2, self2) =>
+                              idx2 ===
+                              self2.findIndex(
+                                (m) =>
+                                  m.message_generated_id ===
+                                  mm2.message_generated_id,
+                              ),
+                          ).length - 1;
+                        const isLastVisitorMsg = iv && i === lastIdx;
+                        return (
+                          <div
+                            key={
+                              mm.message_generated_id
+                                ? `${mm.message_generated_id}-${i}`
+                                : `m-${i}`
+                            }
+                            className={`cw-msg ${iv ? "cw-msg--user" : ""}`}
+                          >
+                            <div
+                              className={`cw-avatar ${iv ? "cw-avatar--user" : "cw-avatar--bot"}`}
+                            >
+                              {iv ? <User size={12} /> : <Users size={13} />}
+                            </div>
+                            <div
+                              className={`cw-bubble ${iv ? "cw-bubble--user" : "cw-bubble--bot"}`}
+                            >
+                              {mm.message}
+                              {iv && isLastVisitorMsg && (
+                                <div className="cw-message-status">
+                                  {mm.is_read ? (
+                                    <CheckCheck
+                                      size={12}
+                                      className="cw-status-read"
+                                    />
+                                  ) : (
+                                    <Check
+                                      size={12}
+                                      className="cw-status-pending"
+                                    />
+                                  )}
+                                </div>
                               )}
                             </div>
-                          )}
+                          </div>
+                        );
+                      })}
+                    {conversationEnded && satisfactionStage === "ask" && (
+                      <div className="cw-post-chat-actions">
+                        <p className="cw-post-chat-text">{ts("wasHelpful")}</p>
+                        <div className="cw-post-chat-buttons">
+                          <button
+                            className="cw-btn cw-btn--query"
+                            onClick={handleRaiseQueryFromEnd}
+                            type="button"
+                          >
+                            <FileText size={14} />
+                            {ts("raiseQueryEnd")}
+                          </button>
+                          <button
+                            className="cw-btn cw-btn--satisfied"
+                            onClick={handleConversationSatisfied}
+                            type="button"
+                          >
+                            <Check size={14} />
+                            {ts("allGoodThanks")}
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
-                {conversationEnded && satisfactionStage === "ask" && (
-                  <div className="cw-post-chat-actions">
-                    <p className="cw-post-chat-text">
-                      Was this conversation helpful? Let us know, or raise a
-                      query if something&apos;s still unresolved.
-                    </p>
-                    <div className="cw-post-chat-buttons">
-                      <button
-                        className="cw-btn cw-btn--query"
-                        onClick={handleRaiseQueryFromEnd}
-                        type="button"
-                      >
-                        <FileText size={14} />
-                        Raise a Query
-                      </button>
-                      <button
-                        className="cw-btn cw-btn--satisfied"
-                        onClick={handleConversationSatisfied}
-                        type="button"
-                      >
-                        <Check size={14} />
-                        All Good, Thanks
-                      </button>
+                    )}
+                    {conversationEnded && satisfactionStage === "closed" && (
+                      <div className="cw-post-chat-actions cw-post-chat-actions--closed">
+                        <div className="cw-post-chat-icon">
+                          <PartyPopper size={20} />
+                        </div>
+                        <p className="cw-post-chat-text">
+                          {ts("thanksForChatting")}
+                        </p>
+                        <div className="cw-post-chat-buttons">
+                          <button
+                            className="cw-btn cw-btn--home"
+                            onClick={handleBackToHome}
+                            type="button"
+                          >
+                            <Home size={14} />
+                            {ts("backToHome")}
+                          </button>
+                          <button
+                            className="cw-btn cw-btn--exit"
+                            onClick={handleExitChat}
+                            type="button"
+                          >
+                            <DoorOpen size={14} />
+                            {ts("exitChat")}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                {renderContent()}
+                {(isTyping ||
+                  (flowStep === "live-chat" && chatbotLoading) ||
+                  (flowStep === "mentor-topics" && expertsLoading) ||
+                  (flowStep === "query-category" && expertsLoading)) && (
+                  <div className="cw-msg">
+                    <div className="cw-avatar cw-avatar--bot">
+                      <Bot size={13} />
+                    </div>
+                    <div className="cw-typing">
+                      <span />
+                      <span />
+                      <span />
                     </div>
                   </div>
                 )}
-                {conversationEnded && satisfactionStage === "closed" && (
-                  <div className="cw-post-chat-actions cw-post-chat-actions--closed">
-                    <div className="cw-post-chat-icon">
-                      <PartyPopper size={20} />
-                    </div>
-                    <p className="cw-post-chat-text">
-                      Thanks for chatting with Nimo Bot today!
-                    </p>
-                    <div className="cw-post-chat-buttons">
-                      <button
-                        className="cw-btn cw-btn--home"
-                        onClick={handleBackToHome}
-                        type="button"
-                      >
-                        <Home size={14} />
-                        Back to Home
-                      </button>
-                      <button
-                        className="cw-btn cw-btn--exit"
-                        onClick={handleExitChat}
-                        type="button"
-                      >
-                        <DoorOpen size={14} />
-                        Exit Chat
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-            {renderContent()}
-            {(isTyping ||
-              (flowStep === "live-chat" && chatbotLoading) ||
-              (flowStep === "mentor-topics" && expertsLoading) ||
-              (flowStep === "query-category" && expertsLoading)) && (
-              <div className="cw-msg">
-                <div className="cw-avatar cw-avatar--bot">
-                  <Bot size={13} />
-                </div>
-                <div className="cw-typing">
-                  <span />
-                  <span />
-                  <span />
-                </div>
+                <div ref={messagesEndRef} />
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-          {showFooterInput && flowStep === "mentor-form" && (
-            <div className="cw-input-area">
-              {formError && <div className="cw-form-error">{formError}</div>}
-              {localValidationErrors[mentorFormStep] && !formError && (
-                <div className="cw-form-error">
-                  {localValidationErrors[mentorFormStep]}
+              {showFooterInput && flowStep === "mentor-form" && (
+                <div className="cw-input-area">
+                  {formError && (
+                    <div className="cw-form-error">{formError}</div>
+                  )}
+                  {localValidationErrors[mentorFormStep] && !formError && (
+                    <div className="cw-form-error">
+                      {localValidationErrors[mentorFormStep]}
+                    </div>
+                  )}
+                  <form className="cw-input-row" onSubmit={handleSend}>
+                    <input
+                      className={`cw-input ${formError || localValidationErrors[mentorFormStep] ? "has-error" : ""}`}
+                      placeholder={
+                        mentorFormStep === "name"
+                          ? ts("fullNamePlaceholder")
+                          : mentorFormStep === "mobile"
+                            ? ts("mobilePlaceholder")
+                            : ts("emailPlaceholder")
+                      }
+                      value={draft}
+                      onChange={
+                        mentorFormStep === "name"
+                          ? handleNameInput
+                          : mentorFormStep === "mobile"
+                            ? handleMobileInput
+                            : handleEmailInput
+                      }
+                      type={
+                        mentorFormStep === "email"
+                          ? "email"
+                          : mentorFormStep === "mobile"
+                            ? "tel"
+                            : "text"
+                      }
+                      disabled={isSavingContact}
+                      autoFocus
+                      maxLength={
+                        mentorFormStep === "mobile"
+                          ? 15
+                          : mentorFormStep === "name"
+                            ? 100
+                            : 255
+                      }
+                    />
+                    <button
+                      type="submit"
+                      className="cw-send-btn"
+                      disabled={!draft.trim() || isSavingContact}
+                    >
+                      {isSavingContact ? (
+                        <Loader2 size={16} className="cw-spin" />
+                      ) : (
+                        <Send size={16} />
+                      )}
+                    </button>
+                  </form>
                 </div>
               )}
-              <form className="cw-input-row" onSubmit={handleSend}>
-                <input
-                  className={`cw-input ${formError || localValidationErrors[mentorFormStep] ? "has-error" : ""}`}
-                  placeholder={
-                    mentorFormStep === "name"
-                      ? "Full name..."
-                      : mentorFormStep === "mobile"
-                        ? "Mobile number..."
-                        : "Email address..."
-                  }
-                  value={draft}
-                  onChange={
-                    mentorFormStep === "name"
-                      ? handleNameInput
-                      : mentorFormStep === "mobile"
-                        ? handleMobileInput
-                        : handleEmailInput
-                  }
-                  type={
-                    mentorFormStep === "email"
-                      ? "email"
-                      : mentorFormStep === "mobile"
-                        ? "tel"
-                        : "text"
-                  }
-                  disabled={isSavingContact}
-                  autoFocus
-                  maxLength={
-                    mentorFormStep === "mobile"
-                      ? 15
-                      : mentorFormStep === "name"
-                        ? 100
-                        : 255
-                  }
-                />
-                <button
-                  type="submit"
-                  className="cw-send-btn"
-                  disabled={!draft.trim() || isSavingContact}
-                >
-                  {isSavingContact ? (
-                    <Loader2 size={16} className="cw-spin" />
-                  ) : (
-                    <Send size={16} />
+              {showFooterInput && flowStep === "live-chat" && (
+                <div className="cw-input-area">
+                  {(chatbotErrors.question ||
+                    localValidationErrors.message) && (
+                    <div className="cw-form-error">
+                      {localValidationErrors.message || chatbotErrors.question}
+                    </div>
                   )}
-                </button>
-              </form>
-            </div>
-          )}
-          {showFooterInput && flowStep === "live-chat" && (
-            <div className="cw-input-area">
-              {(chatbotErrors.question || localValidationErrors.message) && (
-                <div className="cw-form-error">
-                  {localValidationErrors.message || chatbotErrors.question}
+                  <form className="cw-input-row" onSubmit={handleLiveChatSend}>
+                    <input
+                      className={`cw-input ${chatbotErrors.question || localValidationErrors.message ? "has-error" : ""}`}
+                      placeholder={ts("askNimoBot")}
+                      value={chatbotQuestion.question ?? ""}
+                      onChange={handleChatMessageInput}
+                      name="question"
+                      maxLength={1000}
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="cw-send-btn"
+                      disabled={
+                        !isValidChatMessage(chatbotQuestion.question || "") ||
+                        chatbotLoading
+                      }
+                    >
+                      {chatbotLoading ? (
+                        <Loader2 size={16} className="cw-spin" />
+                      ) : (
+                        <Send size={16} />
+                      )}
+                    </button>
+                  </form>
                 </div>
               )}
-              <form className="cw-input-row" onSubmit={handleLiveChatSend}>
-                <input
-                  className={`cw-input ${chatbotErrors.question || localValidationErrors.message ? "has-error" : ""}`}
-                  placeholder="Ask Nimo Bot..."
-                  value={chatbotQuestion.question ?? ""}
-                  onChange={handleChatMessageInput}
-                  name="question"
-                  maxLength={1000}
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="cw-send-btn"
-                  disabled={
-                    !isValidChatMessage(chatbotQuestion.question || "") ||
-                    chatbotLoading
-                  }
-                >
-                  {chatbotLoading ? (
-                    <Loader2 size={16} className="cw-spin" />
-                  ) : (
-                    <Send size={16} />
-                  )}
-                </button>
-              </form>
-            </div>
-          )}
-          {showFooterInput &&
-            flowStep === "mentor-chat" &&
-            !conversationEnded && (
-              <div className="cw-input-area">
-                {(mentorErrors.message || localValidationErrors.message) && (
-                  <div className="cw-form-error">
-                    {localValidationErrors.message || mentorErrors.message}
+              {showFooterInput &&
+                flowStep === "mentor-chat" &&
+                !conversationEnded && (
+                  <div className="cw-input-area">
+                    {(mentorErrors.message ||
+                      localValidationErrors.message) && (
+                      <div className="cw-form-error">
+                        {localValidationErrors.message || mentorErrors.message}
+                      </div>
+                    )}
+                    <form
+                      className="cw-input-row"
+                      onSubmit={handleMentorChatSend}
+                    >
+                      <input
+                        className={`cw-input ${mentorErrors.message || localValidationErrors.message ? "has-error" : ""}`}
+                        placeholder={
+                          selectedConversation?.status === "CLOSED"
+                            ? ts("conversationEndedPlaceholder")
+                            : ts("typeMessage")
+                        }
+                        value={mentorMessage.message ?? ""}
+                        onChange={handleMentorMessageInput}
+                        name="message"
+                        maxLength={1000}
+                        disabled={selectedConversation?.status === "CLOSED"}
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        className="cw-send-btn"
+                        disabled={
+                          !isValidChatMessage(mentorMessage.message || "") ||
+                          selectedConversation?.status === "CLOSED"
+                        }
+                      >
+                        <Send size={16} />
+                      </button>
+                    </form>
                   </div>
                 )}
-                <form className="cw-input-row" onSubmit={handleMentorChatSend}>
-                  <input
-                    className={`cw-input ${mentorErrors.message || localValidationErrors.message ? "has-error" : ""}`}
-                    placeholder={
-                      selectedConversation?.status === "CLOSED"
-                        ? "Conversation ended"
-                        : "Type your message..."
-                    }
-                    value={mentorMessage.message ?? ""}
-                    onChange={handleMentorMessageInput}
-                    name="message"
-                    maxLength={1000}
-                    disabled={selectedConversation?.status === "CLOSED"}
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    className="cw-send-btn"
-                    disabled={
-                      !isValidChatMessage(mentorMessage.message || "") ||
-                      selectedConversation?.status === "CLOSED"
-                    }
-                  >
-                    <Send size={16} />
-                  </button>
-                </form>
-              </div>
-            )}
-          <div className="cw-footer-tag">Powered by Nimo Bot</div>
+              <div className="cw-footer-tag">{ts("poweredBy")}</div>
+            </>
+          )}
         </div>
       )}
       {!isOpen && <LauncherBotVideo onClick={() => setIsOpen(true)} />}
