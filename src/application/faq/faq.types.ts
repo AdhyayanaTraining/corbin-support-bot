@@ -21,6 +21,7 @@ export interface LocalizedText {
 export interface FAQAnswer {
   answer_generated_id?: string;
   answer_text: LocalizedText;
+  answer_images?: string[]; // Added: Array of image URLs/base64 strings
   created_by: string;
   created_at?: string;
 }
@@ -104,6 +105,7 @@ export interface UpdateFAQQuestionPayload {
 
 export interface CreateFAQAnswerPayload {
   answer_text: string;
+  answer_images?: string[]; // Added: Optional array of image strings
   created_by?: string;
 }
 
@@ -112,7 +114,8 @@ export interface CreateFAQAnswerPayload {
 // ======================================================
 
 export interface UpdateFAQAnswerPayload {
-  answer_text: string;
+  answer_text?: string;
+  answer_images?: string[]; // Added: Optional array of image strings
 }
 
 // ======================================================

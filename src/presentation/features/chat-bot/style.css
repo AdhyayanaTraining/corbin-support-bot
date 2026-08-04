@@ -1659,7 +1659,146 @@
   z-index: 1000;
   overflow: hidden;
 }
+/* ============ IMAGE PREVIEW MODAL ============ */
+.cw-image-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: cw-fade-in 0.2s ease;
+}
 
+.cw-image-modal {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 12px;
+  overflow: hidden;
+  animation: cw-pop 0.2s ease;
+}
+
+.cw-image-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+  transition: background 0.2s ease;
+}
+
+.cw-image-modal-close:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.cw-image-modal-img {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  display: block;
+}
+
+/* ============ ANSWER IMAGES (in answer box) ============ */
+.cw-answer-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(14, 39, 73, 0.06);
+}
+
+.cw-answer-image-thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid var(--cw-border);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.cw-answer-image-thumb:hover {
+  transform: scale(1.05);
+  border-color: var(--cw-primary-light);
+  box-shadow: 0 2px 8px rgba(14, 39, 73, 0.15);
+}
+
+/* ============ BUBBLE IMAGES (in chat messages) ============ */
+.cw-bubble-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cw-bubble-image {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.cw-bubble--bot .cw-bubble-image {
+  border-color: rgba(14, 39, 73, 0.12);
+}
+
+.cw-bubble--user .cw-bubble-image {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.cw-bubble-image:hover {
+  transform: scale(1.08);
+}
+
+/* ============ RESPONSIVE IMAGE STYLES ============ */
+@media (max-width: 480px) {
+  .cw-image-modal-overlay {
+    padding: 12px;
+  }
+
+  .cw-image-modal-close {
+    top: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .cw-answer-image-thumb {
+    width: 64px;
+    height: 64px;
+  }
+
+  .cw-bubble-image {
+    width: 80px;
+    height: 80px;
+  }
+
+  .cw-answer-images {
+    gap: 6px;
+  }
+
+  .cw-bubble-images {
+    gap: 4px;
+  }
+}
 .cw-language-dropdown-item {
   display: flex;
   align-items: center;
