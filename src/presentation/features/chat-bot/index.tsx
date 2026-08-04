@@ -1,7 +1,3 @@
-// /* eslint-disable react-hooks/immutability */
-// /* eslint-disable react-hooks/preserve-manual-memoization */
-// /* eslint-disable react-hooks/set-state-in-effect */
-// /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/immutability */
 /* eslint-disable react-hooks/preserve-manual-memoization */
 /* eslint-disable react-hooks/set-state-in-effect */
@@ -967,6 +963,13 @@ const translations: Record<SupportedLanguage, Translations> = {
   },
 };
 
+// ========== Helper function to get localized text from LocalizedText ==========
+const getLocalizedText = (value: any, language: string): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value[language] ?? value.en ?? Object.values(value)[0] ?? "";
+};
+
 // ========== Helper function to get translation ==========
 function getTranslation(
   lang: string | undefined,
@@ -975,6 +978,8 @@ function getTranslation(
   const t = translations[lang as SupportedLanguage] || translations.en;
   return t[key];
 }
+
+// ... (MENTOR_STEPS, validation functions, storage keys remain the same)
 
 const MENTOR_STEPS: {
   key: MentorFormStep;
@@ -1023,6 +1028,8 @@ const sanitizeName = (value: string) => {
 const CONTACT_STORAGE_KEY = "nimobot_contact_details";
 const FAQ_TOPIC_STORAGE_KEY = "nimobot_selected_faq_topic";
 const LAUNCHER_SIZE = 84;
+
+// ... (LauncherBotVideo, NimoBotProfile, LanguageDropdown remain the same)
 
 function LauncherBotVideo({ onClick }: { onClick: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1843,12 +1850,15 @@ function ChatWidgetInner() {
       setSelectedCategory(null);
       setSelectedQuestion(null);
       setFlowStep("faq-categories");
-      pushMessage("user", faq.faq_default_question);
+      pushMessage(
+        "user",
+        getLocalizedText(faq.faq_default_question, selectedLanguage || "en"),
+      );
       (faq.categories || []).length > 0
         ? simulateTyping(ts("hereAreCategories"))
         : simulateTyping(ts("noCategoriesYet"));
     },
-    [pushMessage, simulateTyping, ts],
+    [pushMessage, simulateTyping, ts, selectedLanguage],
   );
 
   const handleCategorySelect = useCallback(
@@ -1856,13 +1866,18 @@ function ChatWidgetInner() {
       setSelectedCategory(cat);
       setSelectedQuestion(null);
       setFlowStep("faq-questions");
-      pushMessage("user", cat.topic_name || ts("unknown"));
+      pushMessage(
+        "user",
+        getLocalizedText(cat.topic_name, selectedLanguage || "en") ||
+          ts("unknown"),
+      );
       try {
         window.localStorage.setItem(
           FAQ_TOPIC_STORAGE_KEY,
           JSON.stringify({
             id: cat.category_generated_id ?? null,
-            name: cat.topic_name ?? "",
+            name:
+              getLocalizedText(cat.topic_name, selectedLanguage || "en") ?? "",
           }),
         );
       } catch (err) {}
@@ -1870,24 +1885,29 @@ function ChatWidgetInner() {
         ? simulateTyping(ts("hereAreQuestions"))
         : simulateTyping(ts("noQuestionsYet"));
     },
-    [pushMessage, simulateTyping, ts],
+    [pushMessage, simulateTyping, ts, selectedLanguage],
   );
 
   const handleQuestionSelect = useCallback(
     (q: FAQQuestion) => {
       setSelectedQuestion(q);
-      pushMessage("user", q.question_text);
+      pushMessage(
+        "user",
+        getLocalizedText(q.question_text, selectedLanguage || "en"),
+      );
       const answers = q.answers || [];
       answers.length > 0
         ? simulateTyping(
             answers
-              .map((a) => a.answer_text)
+              .map((a) =>
+                getLocalizedText(a.answer_text, selectedLanguage || "en"),
+              )
               .filter(Boolean)
               .join("\n\n"),
           )
         : simulateTyping(ts("noAnswerYet"));
     },
-    [pushMessage, simulateTyping, ts],
+    [pushMessage, simulateTyping, ts, selectedLanguage],
   );
 
   const handleShowSatisfaction = useCallback(() => {
@@ -2324,13 +2344,20 @@ function ChatWidgetInner() {
     [mentorMessage, selectedConversation, sendMentorMessage],
   );
 
+  // ========== UPDATED HEADER TITLE WITH LOCALIZATION ==========
   const headerTitle =
     flowStep === "faq-list"
       ? "Nimo Bot"
       : flowStep === "faq-categories"
-        ? (selectedFAQ?.faq_default_question ?? ts("categories"))
+        ? getLocalizedText(
+            selectedFAQ?.faq_default_question,
+            selectedLanguage || "en",
+          ) || ts("categories")
         : flowStep === "faq-questions"
-          ? (selectedCategory?.topic_name ?? ts("questions"))
+          ? getLocalizedText(
+              selectedCategory?.topic_name,
+              selectedLanguage || "en",
+            ) || ts("questions")
           : flowStep === "mentor-form"
             ? ts("contactSupport")
             : flowStep === "query-category"
@@ -2400,6 +2427,7 @@ function ChatWidgetInner() {
     );
   };
 
+  // ========== UPDATED RENDER CONTENT WITH LOCALIZATION ==========
   const renderContent = () => {
     if (flowStep === "faq-list")
       return (
@@ -2434,7 +2462,13 @@ function ChatWidgetInner() {
                     type="button"
                   >
                     <MessageSquare size={14} />
-                    <span>{faq.faq_default_question}</span>
+                    {/* UPDATED: Localized FAQ question */}
+                    <span>
+                      {getLocalizedText(
+                        faq.faq_default_question,
+                        selectedLanguage || "en",
+                      )}
+                    </span>
                   </button>
                 ))}
             </div>
@@ -2475,7 +2509,13 @@ function ChatWidgetInner() {
                   type="button"
                 >
                   <Folder size={14} />
-                  <span>{cat.topic_name || ts("unknown")}</span>
+                  {/* UPDATED: Localized category name */}
+                  <span>
+                    {getLocalizedText(
+                      cat.topic_name,
+                      selectedLanguage || "en",
+                    ) || ts("unknown")}
+                  </span>
                 </button>
               ))}
             </div>
@@ -2502,7 +2542,11 @@ function ChatWidgetInner() {
             <span className="cw-section-icon">
               <FileText size={15} />
             </span>
-            {selectedCategory.topic_name || ts("questions")}
+            {/* UPDATED: Localized question header */}
+            {getLocalizedText(
+              selectedCategory.topic_name,
+              selectedLanguage || "en",
+            ) || ts("questions")}
           </div>
           {questions.length === 0 ? (
             <div className="cw-empty-state">{ts("noQuestionsYet")}</div>
@@ -2517,7 +2561,13 @@ function ChatWidgetInner() {
                   type="button"
                 >
                   <FileText size={14} />
-                  <span>{q.question_text}</span>
+                  {/* UPDATED: Localized question text */}
+                  <span>
+                    {getLocalizedText(
+                      q.question_text,
+                      selectedLanguage || "en",
+                    )}
+                  </span>
                 </button>
               ))}
             </div>
@@ -2526,13 +2576,23 @@ function ChatWidgetInner() {
             <div className="cw-answer-box">
               <div className="cw-answer-box-header">
                 <MessageSquare size={14} />
-                <span>{selectedQuestion.question_text}</span>
+                {/* UPDATED: Localized answer box header */}
+                <span>
+                  {getLocalizedText(
+                    selectedQuestion.question_text,
+                    selectedLanguage || "en",
+                  )}
+                </span>
               </div>
               {(selectedQuestion.answers || []).length > 0 ? (
                 <div className="cw-answer-list">
                   {(selectedQuestion.answers || []).map((a, i) => (
                     <p key={i} className="cw-answer-item">
-                      {a.answer_text}
+                      {/* UPDATED: Localized answer text */}
+                      {getLocalizedText(
+                        a.answer_text,
+                        selectedLanguage || "en",
+                      )}
                     </p>
                   ))}
                 </div>
