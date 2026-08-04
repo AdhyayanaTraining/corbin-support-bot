@@ -155,6 +155,7 @@ class FAQService {
       category_generated_id,
       question_generated_id,
       answer_text: payload.answer_text,
+      answer_images: payload.answer_images || [], // Added: Send images array
     });
     return response.data;
   }
@@ -172,6 +173,7 @@ class FAQService {
       question_generated_id,
       answer_generated_id,
       answer_text: payload.answer_text,
+      answer_images: payload.answer_images, // Added: Send images array for update
     });
     return response.data;
   }

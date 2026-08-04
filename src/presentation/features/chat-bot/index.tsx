@@ -74,6 +74,7 @@ interface Message {
   id: string;
   sender: Sender;
   text: string;
+  images?: string[];
 }
 
 type FlowStep =
@@ -125,15 +126,11 @@ const LANGUAGES = [
 type SupportedLanguage = "en" | "hi" | "te" | "ta" | "kn";
 
 interface Translations {
-  // Welcome
   welcomeMessage: string;
-
-  // Language selector
   chooseLanguage: string;
   selectYourLanguage: string;
   choosePreferredLanguage: string;
   changeLanguageLabel: string;
-  // FAQ
   pickQuestion: string;
   categories: string;
   noCategoriesYet: string;
@@ -145,15 +142,11 @@ interface Translations {
   cantFindAnswer: string;
   talkToSupportTeam: string;
   needMoreHelp: string;
-
-  // Back navigation
   back: string;
   hereAreFAQAgain: string;
   hereAreCategoriesAgain: string;
   howToProceed: string;
   whichCategory: string;
-
-  // Mentor form
   contactSupport: string;
   name: string;
   mobile: string;
@@ -171,8 +164,6 @@ interface Translations {
   invalidName: string;
   invalidMobile: string;
   invalidEmail: string;
-
-  // Mentor options
   howCanWeHelp: string;
   welcomeBack: (name: string) => string;
   notYou: string;
@@ -185,8 +176,6 @@ interface Translations {
   endChat: string;
   endChatDesc: string;
   youAreNowChatting: (name: string) => string;
-
-  // Mentor topics
   pickTopic: string;
   noMentorCategories: string;
   couldntLoadTopics: string;
@@ -196,8 +185,6 @@ interface Translations {
   couldntStartConversation: (expert: string) => string;
   noMentorsAvailable: (category: string) => string;
   connectionError: string;
-
-  // Resume conversation
   resumeConversation: string;
   resumeConversationDesc: (name: string) => string;
   startNewTopic: string;
@@ -207,8 +194,6 @@ interface Translations {
   tapToResume: string;
   resumingConversation: string;
   activeConversationPrompt: string;
-
-  // Query
   raiseAQuery: string;
   whichCategoryQuery: string;
   gotItTitleDetails: string;
@@ -229,8 +214,6 @@ interface Translations {
   queryTitleError: string;
   queryDescriptionError: string;
   change: string;
-
-  // Mentor chat
   mentorChat: string;
   conversationEnded: string;
   wasHelpful: string;
@@ -243,21 +226,15 @@ interface Translations {
   haveGreatDay: string;
   typeMessage: string;
   conversationEndedPlaceholder: string;
-
-  // Status
   mentorConnected: string;
   closed: string;
   waiting: string;
   nimoBotOnline: string;
   switch_: string;
   sureHowToProceed: string;
-
-  // Chat with bot
   askNimoBot: string;
   iNeedMoreHelp: string;
   raiseQueryEnd: string;
-
-  // Misc
   poweredBy: string;
   unknown: string;
   resumeChatting: string;
@@ -1196,6 +1173,32 @@ function LanguageDropdown({
   );
 }
 
+// ========== IMAGE PREVIEW MODAL ==========
+function ImagePreviewModal({
+  imageUrl,
+  onClose,
+}: {
+  imageUrl: string | null;
+  onClose: () => void;
+}) {
+  if (!imageUrl) return null;
+
+  return (
+    <div className="cw-image-modal-overlay" onClick={onClose}>
+      <div className="cw-image-modal" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="cw-image-modal-close"
+          onClick={onClose}
+          type="button"
+        >
+          <X size={20} />
+        </button>
+        <img src={imageUrl} alt="Preview" className="cw-image-modal-img" />
+      </div>
+    </div>
+  );
+}
+
 function ChatWidgetInner() {
   const { faqs, loading: faqsLoading } = useFAQ();
   const {
@@ -1287,6 +1290,7 @@ function ChatWidgetInner() {
   const [connectingCategoryId, setConnectingCategoryId] = useState<
     string | null
   >(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSavedContact = useRef(false);
@@ -1298,7 +1302,6 @@ function ChatWidgetInner() {
   const [localValidationErrors, setLocalValidationErrors] =
     useState<ValidationErrors>({});
 
-  // Helper to get current language translations
   const t = useCallback(
     (key: keyof Translations): any => {
       const translate = getTranslation(selectedLanguage, key);
@@ -1307,7 +1310,6 @@ function ChatWidgetInner() {
     [selectedLanguage],
   );
 
-  // Helper to get string translation (not function)
   const ts = useCallback(
     (key: keyof Translations): string => {
       const translate = getTranslation(selectedLanguage, key);
@@ -1316,7 +1318,6 @@ function ChatWidgetInner() {
     [selectedLanguage],
   );
 
-  // Check for saved language preference
   useEffect(() => {
     try {
       const savedLang = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -1331,7 +1332,6 @@ function ChatWidgetInner() {
     } catch (err) {}
   }, []);
 
-  // Handle language selection
   const handleLanguageSelect = useCallback(
     (languageCode: string) => {
       changeLanguage(languageCode);
@@ -1434,12 +1434,20 @@ function ChatWidgetInner() {
     };
   }, [flowStep, selectedConversation?.conversation_generated_id]);
 
-  const pushMessage = useCallback((sender: Sender, text: string) => {
-    setMessages((prev) => [
-      ...prev,
-      { id: `${Date.now()}-${sender}-${Math.random()}`, sender, text },
-    ]);
-  }, []);
+  const pushMessage = useCallback(
+    (sender: Sender, text: string, images?: string[]) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-${sender}-${Math.random()}`,
+          sender,
+          text,
+          images,
+        },
+      ]);
+    },
+    [],
+  );
 
   const simulateTyping = useCallback(
     (text: string, delay = 550) => {
@@ -1540,15 +1548,12 @@ function ChatWidgetInner() {
     };
   }, [querySubmitTrigger]);
 
-  // ========== INPUT HANDLERS WITH REAL-TIME VALIDATION ==========
-
   const handleNameInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       const filtered = value.replace(/[^A-Za-z\s'-]/g, "");
       setDraft(filtered);
       if (formError) setFormError(null);
-
       if (filtered.trim().length > 0 && filtered.trim().length < 3) {
         setLocalValidationErrors((prev) => ({
           ...prev,
@@ -1572,12 +1577,10 @@ function ChatWidgetInner() {
   const handleMobileInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
-      const digits = value.replace(/\D/g, "");
-      const limited = digits.slice(0, 15);
-      setDraft(limited);
+      const digits = value.replace(/\D/g, "").slice(0, 15);
+      setDraft(digits);
       if (formError) setFormError(null);
-
-      if (limited.length > 0 && limited.length < 10) {
+      if (digits.length > 0 && digits.length < 10) {
         setLocalValidationErrors((prev) => ({
           ...prev,
           mobile: ts("invalidMobile"),
@@ -1597,7 +1600,6 @@ function ChatWidgetInner() {
       const value = e.target.value;
       setDraft(value);
       if (formError) setFormError(null);
-
       if (value.trim().length > 0 && !isValidEmail(value)) {
         setLocalValidationErrors((prev) => ({
           ...prev,
@@ -1615,55 +1617,25 @@ function ChatWidgetInner() {
 
   const handleChatMessageInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
       handleChatbotChange(e);
-
-      if (value.trim().length > 1000) {
-        setLocalValidationErrors((prev) => ({
-          ...prev,
-          message: "Message cannot exceed 1000 characters.",
-        }));
-      } else {
-        setLocalValidationErrors((prev) => {
-          const { message, ...rest } = prev;
-          return rest;
-        });
-      }
     },
     [handleChatbotChange],
   );
 
   const handleMentorMessageInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
       handleMentorMessageChange(e);
-
-      if (value.trim().length > 1000) {
-        setLocalValidationErrors((prev) => ({
-          ...prev,
-          message: "Message cannot exceed 1000 characters.",
-        }));
-      } else {
-        setLocalValidationErrors((prev) => {
-          const { message, ...rest } = prev;
-          return rest;
-        });
-      }
     },
     [handleMentorMessageChange],
   );
 
-  // ========== QUERY FORM VALIDATION ==========
-
   const validateQueryForm = useCallback((): boolean => {
     const errors: ValidationErrors = {};
     let isValid = true;
-
     if (!requestQuery.category) {
       errors.category = ts("selectCategoryError");
       isValid = false;
     }
-
     if (
       !requestQuery.query_title ||
       !isValidQueryTitle(requestQuery.query_title)
@@ -1671,7 +1643,6 @@ function ChatWidgetInner() {
       errors.query_title = ts("queryTitleError");
       isValid = false;
     }
-
     if (
       !requestQuery.query_description ||
       !isValidQueryDescription(requestQuery.query_description)
@@ -1679,7 +1650,6 @@ function ChatWidgetInner() {
       errors.query_description = ts("queryDescriptionError");
       isValid = false;
     }
-
     setLocalValidationErrors(errors);
     return isValid;
   }, [
@@ -1896,16 +1866,33 @@ function ChatWidgetInner() {
         getLocalizedText(q.question_text, selectedLanguage || "en"),
       );
       const answers = q.answers || [];
-      answers.length > 0
-        ? simulateTyping(
-            answers
-              .map((a) =>
-                getLocalizedText(a.answer_text, selectedLanguage || "en"),
-              )
-              .filter(Boolean)
-              .join("\n\n"),
-          )
-        : simulateTyping(ts("noAnswerYet"));
+      if (answers.length > 0) {
+        const firstAnswer = answers[0];
+        const answerText = getLocalizedText(
+          firstAnswer.answer_text,
+          selectedLanguage || "en",
+        );
+        const answerImages = firstAnswer.answer_images || [];
+        if (answerImages.length > 0) {
+          pushMessage("bot", answerText, answerImages);
+        } else {
+          simulateTyping(answerText);
+        }
+        if (answers.length > 1) {
+          setTimeout(() => {
+            answers.slice(1).forEach((a) => {
+              const text = getLocalizedText(
+                a.answer_text,
+                selectedLanguage || "en",
+              );
+              const images = a.answer_images || [];
+              pushMessage("bot", text, images);
+            });
+          }, 600);
+        }
+      } else {
+        simulateTyping(ts("noAnswerYet"));
+      }
     },
     [pushMessage, simulateTyping, ts, selectedLanguage],
   );
@@ -1976,7 +1963,6 @@ function ChatWidgetInner() {
   const handleMentorFormSubmit = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
-
     if (mentorFormStep === "name") {
       if (!isValidName(text)) {
         setFormError(ts("invalidName"));
@@ -1995,7 +1981,6 @@ function ChatWidgetInner() {
       simulateTyping(niceToMeetMsg);
       return;
     }
-
     if (mentorFormStep === "mobile") {
       if (!isValidMobile(text)) {
         setFormError(ts("invalidMobile"));
@@ -2010,7 +1995,6 @@ function ChatWidgetInner() {
       simulateTyping(ts("emailAddress"));
       return;
     }
-
     if (!isValidEmail(text)) {
       setFormError(ts("invalidEmail"));
       return;
@@ -2073,13 +2057,10 @@ function ChatWidgetInner() {
     }
     try {
       const cats = await getExpertCategories();
-      if (cats.length > 0) {
-        simulateTyping(ts("pickTopic"));
-        setFlowStep("mentor-topics");
-      } else {
-        simulateTyping(ts("noMentorCategories"));
-        setFlowStep("mentor-options");
-      }
+      cats.length > 0
+        ? (simulateTyping(ts("pickTopic")), setFlowStep("mentor-topics"))
+        : (simulateTyping(ts("noMentorCategories")),
+          setFlowStep("mentor-options"));
     } catch (err) {
       simulateTyping(ts("couldntLoadTopics"));
       setFlowStep("mentor-options");
@@ -2103,13 +2084,10 @@ function ChatWidgetInner() {
     pushMessage("user", ts("startNewTopic"));
     try {
       const cats = await getExpertCategories();
-      if (cats.length > 0) {
-        simulateTyping(ts("pickTopic"));
-        setFlowStep("mentor-topics");
-      } else {
-        simulateTyping(ts("noMentorCategories"));
-        setFlowStep("mentor-options");
-      }
+      cats.length > 0
+        ? (simulateTyping(ts("pickTopic")), setFlowStep("mentor-topics"))
+        : (simulateTyping(ts("noMentorCategories")),
+          setFlowStep("mentor-options"));
     } catch (err) {
       simulateTyping(ts("couldntLoadTopics"));
       setFlowStep("mentor-options");
@@ -2142,13 +2120,11 @@ function ChatWidgetInner() {
     (async () => {
       try {
         const cats = await getExpertCategories();
-        if (cats.length > 0) {
-          simulateTyping(ts("whichCategoryQuery"));
-          setFlowStep("query-category");
-        } else {
-          simulateTyping(ts("giveMeTitleDetails"));
-          setFlowStep("query-form");
-        }
+        cats.length > 0
+          ? (simulateTyping(ts("whichCategoryQuery")),
+            setFlowStep("query-category"))
+          : (simulateTyping(ts("giveMeTitleDetails")),
+            setFlowStep("query-form"));
       } catch (err) {
         simulateTyping(ts("giveMeTitleDetails"));
         setFlowStep("query-form");
@@ -2198,17 +2174,14 @@ function ChatWidgetInner() {
   const handleRaiseQueryFromEnd = useCallback(() => {
     handleStartQueryForm();
   }, [handleStartQueryForm]);
-
   const handleConversationSatisfied = useCallback(() => {
     pushMessage("user", ts("allGoodThanks"));
     simulateTyping(ts("wonderfulThanks"));
     setSatisfactionStage("closed");
   }, [pushMessage, simulateTyping, ts]);
-
   const handleExitChat = useCallback(() => {
     setIsOpen(false);
   }, []);
-
   const handleBackToHome = useCallback(() => {
     handleStart();
   }, [handleStart]);
@@ -2243,13 +2216,13 @@ function ChatWidgetInner() {
         if (experts.length > 0) {
           const firstExpert = experts[0];
           setAutoSelectedExpert(firstExpert);
-          const connectingMsg = (
-            t("connectingYouWith") as (
-              expert: string,
-              category: string,
-            ) => string
-          )(firstExpert.name, cat.name);
-          pushMessage("bot", connectingMsg);
+          pushMessage(
+            "bot",
+            (t("connectingYouWith") as (e: string, c: string) => string)(
+              firstExpert.name,
+              cat.name,
+            ),
+          );
           const c = savedContact ?? mentorForm;
           const success = await createConversation({
             visitor_name: c.name,
@@ -2260,23 +2233,24 @@ function ChatWidgetInner() {
             category_name: cat.name ?? "",
           });
           if (success) {
-            const talkingMsg = (
-              t("nowTalkingTo") as (expert: string) => string
-            )(firstExpert.name);
-            pushMessage("bot", talkingMsg);
+            pushMessage(
+              "bot",
+              (t("nowTalkingTo") as (e: string) => string)(firstExpert.name),
+            );
             setHasActiveConversation(true);
             setFlowStep("mentor-chat");
-          } else {
-            const errorMsg = (
-              t("couldntStartConversation") as (expert: string) => string
-            )(firstExpert.name);
-            pushMessage("bot", errorMsg);
-          }
+          } else
+            pushMessage(
+              "bot",
+              (t("couldntStartConversation") as (e: string) => string)(
+                firstExpert.name,
+              ),
+            );
         } else {
-          const noMentorMsg = (
-            t("noMentorsAvailable") as (category: string) => string
-          )(cat.name);
-          pushMessage("bot", noMentorMsg);
+          pushMessage(
+            "bot",
+            (t("noMentorsAvailable") as (c: string) => string)(cat.name),
+          );
           setFlowStep("mentor-topics");
         }
       } catch (err) {
@@ -2302,13 +2276,10 @@ function ChatWidgetInner() {
   const handleSubmitQuery = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
-      if (validateQueryForm()) {
-        setQuerySubmitTrigger((n) => n + 1);
-      }
+      if (validateQueryForm()) setQuerySubmitTrigger((n) => n + 1);
     },
     [validateQueryForm],
   );
-
   const handleSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2316,7 +2287,6 @@ function ChatWidgetInner() {
     },
     [flowStep, handleMentorFormSubmit],
   );
-
   const handleLiveChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2327,7 +2297,6 @@ function ChatWidgetInner() {
     },
     [chatbotQuestion, askQuestion],
   );
-
   const handleMentorChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2344,7 +2313,6 @@ function ChatWidgetInner() {
     [mentorMessage, selectedConversation, sendMentorMessage],
   );
 
-  // ========== UPDATED HEADER TITLE WITH LOCALIZATION ==========
   const headerTitle =
     flowStep === "faq-list"
       ? "Nimo Bot"
@@ -2377,8 +2345,8 @@ function ChatWidgetInner() {
                             selectedConversation?.category_name ??
                             ts("mentorChat"))
                           : "Next Steps";
-  const displayContact = savedContact ?? mentorForm;
 
+  const displayContact = savedContact ?? mentorForm;
   const showHomeButton =
     !!savedContact &&
     (
@@ -2427,7 +2395,6 @@ function ChatWidgetInner() {
     );
   };
 
-  // ========== UPDATED RENDER CONTENT WITH LOCALIZATION ==========
   const renderContent = () => {
     if (flowStep === "faq-list")
       return (
@@ -2462,7 +2429,6 @@ function ChatWidgetInner() {
                     type="button"
                   >
                     <MessageSquare size={14} />
-                    {/* UPDATED: Localized FAQ question */}
                     <span>
                       {getLocalizedText(
                         faq.faq_default_question,
@@ -2509,7 +2475,6 @@ function ChatWidgetInner() {
                   type="button"
                 >
                   <Folder size={14} />
-                  {/* UPDATED: Localized category name */}
                   <span>
                     {getLocalizedText(
                       cat.topic_name,
@@ -2542,7 +2507,6 @@ function ChatWidgetInner() {
             <span className="cw-section-icon">
               <FileText size={15} />
             </span>
-            {/* UPDATED: Localized question header */}
             {getLocalizedText(
               selectedCategory.topic_name,
               selectedLanguage || "en",
@@ -2561,7 +2525,6 @@ function ChatWidgetInner() {
                   type="button"
                 >
                   <FileText size={14} />
-                  {/* UPDATED: Localized question text */}
                   <span>
                     {getLocalizedText(
                       q.question_text,
@@ -2576,7 +2539,6 @@ function ChatWidgetInner() {
             <div className="cw-answer-box">
               <div className="cw-answer-box-header">
                 <MessageSquare size={14} />
-                {/* UPDATED: Localized answer box header */}
                 <span>
                   {getLocalizedText(
                     selectedQuestion.question_text,
@@ -2587,13 +2549,29 @@ function ChatWidgetInner() {
               {(selectedQuestion.answers || []).length > 0 ? (
                 <div className="cw-answer-list">
                   {(selectedQuestion.answers || []).map((a, i) => (
-                    <p key={i} className="cw-answer-item">
-                      {/* UPDATED: Localized answer text */}
-                      {getLocalizedText(
-                        a.answer_text,
-                        selectedLanguage || "en",
+                    <div key={i} className="cw-answer-item">
+                      <p>
+                        {getLocalizedText(
+                          a.answer_text,
+                          selectedLanguage || "en",
+                        )}
+                      </p>
+                      {(a.answer_images || []).length > 0 && (
+                        <div className="cw-answer-images">
+                          {(a.answer_images || []).map(
+                            (img: string, idx: number) => (
+                              <img
+                                key={idx}
+                                src={img}
+                                alt={`Answer ${i + 1} image ${idx + 1}`}
+                                className="cw-answer-image-thumb"
+                                onClick={() => setPreviewImage(img)}
+                              />
+                            ),
+                          )}
+                        </div>
                       )}
-                    </p>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -3007,6 +2985,10 @@ function ChatWidgetInner() {
 
   return (
     <div className="cw-root">
+      <ImagePreviewModal
+        imageUrl={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
       {isOpen && (
         <div className="cw-panel" role="dialog" aria-label="Nimo Bot">
           {showLanguageSelector ? (
@@ -3135,12 +3117,27 @@ function ChatWidgetInner() {
                       className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"}`}
                     >
                       {m.sender === "bot" ? (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                        >
-                          {m.text}
-                        </ReactMarkdown>
+                        <>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                          >
+                            {m.text}
+                          </ReactMarkdown>
+                          {m.images && m.images.length > 0 && (
+                            <div className="cw-bubble-images">
+                              {m.images.map((img: string, idx: number) => (
+                                <img
+                                  key={idx}
+                                  src={img}
+                                  alt={`Image ${idx + 1}`}
+                                  className="cw-bubble-image"
+                                  onClick={() => setPreviewImage(img)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         m.text
                       )}
