@@ -37,8 +37,23 @@ import { validateTopic, TopicValidationErrors } from "./topic.validation";
 
 const EMPTY_TOPIC: CreateTopicPayload = {
   topic_name: "",
+
   topic_description: "",
+
+  // ======================================================
+  // TOPIC EXPERT
+  // ======================================================
+
+  topic_expert_name: "",
+
+  topic_expert_email: "",
+
+  // ======================================================
+  // STATUS
+  // ======================================================
+
   isActiveTopic: true,
+
   topic_created_by: "admin",
 };
 
@@ -172,13 +187,29 @@ export const TopicProvider = ({ children }: { children: ReactNode }) => {
 
     setTopic({
       topic_name: selected.topic_name,
+
       topic_description: selected.topic_description,
+
+      // ======================================================
+      // TOPIC EXPERT
+      // ======================================================
+
+      topic_expert_name: selected.topic_expert_name,
+
+      topic_expert_email: selected.topic_expert_email,
+
+      // ======================================================
+      // STATUS
+      // ======================================================
+
       isActiveTopic: selected.isActiveTopic,
+
       topic_created_by: selected.topic_created_by,
     });
 
     setErrors({});
   };
+
   // ======================================================
   // GET ALL TOPICS
   // ======================================================
@@ -250,6 +281,7 @@ export const TopicProvider = ({ children }: { children: ReactNode }) => {
       return false;
     } catch (error) {
       console.error("Failed to create topic.", error);
+
       return false;
     } finally {
       setLoading(false);
@@ -283,6 +315,7 @@ export const TopicProvider = ({ children }: { children: ReactNode }) => {
       return false;
     } catch (error) {
       console.error("Failed to update topic.", error);
+
       return false;
     } finally {
       setLoading(false);
@@ -310,11 +343,13 @@ export const TopicProvider = ({ children }: { children: ReactNode }) => {
       return false;
     } catch (error) {
       console.error("Failed to delete topic.", error);
+
       return false;
     } finally {
       setLoading(false);
     }
   };
+
   // ======================================================
   // CONTEXT VALUE
   // ======================================================
