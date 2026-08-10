@@ -9,7 +9,23 @@ export interface Topic {
 
   topic_description: string;
 
+  // ======================================================
+  // TOPIC EXPERT
+  // ======================================================
+
+  topic_expert_name: string;
+
+  topic_expert_email: string;
+
+  // ======================================================
+  // STATUS
+  // ======================================================
+
   isActiveTopic: boolean;
+
+  // ======================================================
+  // AUDIT
+  // ======================================================
 
   topic_created_by: string;
 
@@ -29,6 +45,18 @@ export interface CreateTopicPayload {
 
   topic_description: string;
 
+  // ======================================================
+  // TOPIC EXPERT
+  // ======================================================
+
+  topic_expert_name: string;
+
+  topic_expert_email: string;
+
+  // ======================================================
+  // STATUS
+  // ======================================================
+
   isActiveTopic: boolean;
 
   topic_created_by: string;
@@ -39,11 +67,21 @@ export interface CreateTopicPayload {
 // ======================================================
 
 export interface UpdateTopicPayload {
-  topic_generated_id: string;
-
   topic_name: string;
 
   topic_description: string;
+
+  // ======================================================
+  // TOPIC EXPERT
+  // ======================================================
+
+  topic_expert_name: string;
+
+  topic_expert_email: string;
+
+  // ======================================================
+  // STATUS
+  // ======================================================
 
   isActiveTopic: boolean;
 
@@ -56,7 +94,14 @@ export interface UpdateTopicPayload {
 
 export const EMPTY_TOPIC: CreateTopicPayload = {
   topic_name: "",
+
   topic_description: "",
+
+  topic_expert_name: "",
+
+  topic_expert_email: "",
+
   isActiveTopic: true,
+
   topic_created_by: "admin",
 };
