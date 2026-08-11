@@ -89,6 +89,7 @@
       "max-height": BUBBLE_SIZE.height,
       "min-width": BUBBLE_SIZE.width,
       "min-height": BUBBLE_SIZE.height,
+      "border-radius": "50%",
       "box-shadow": "0 4px 20px rgba(0, 0, 0, 0.15)",
     });
   }
@@ -146,6 +147,7 @@
     display: "block",
     visibility: "visible",
     opacity: "1",
+    "border-radius": "50%",
     "box-shadow": "0 4px 20px rgba(0, 0, 0, 0.15)",
     transition:
       "width .35s cubic-bezier(0.4, 0, 0.2, 1), height .35s cubic-bezier(0.4, 0, 0.2, 1), right .35s cubic-bezier(0.4, 0, 0.2, 1), bottom .35s cubic-bezier(0.4, 0, 0.2, 1), border-radius .35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .35s cubic-bezier(0.4, 0, 0.2, 1)",
