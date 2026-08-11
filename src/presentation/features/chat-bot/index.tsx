@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-no-comment-textnodes */
 /* eslint-disable react-hooks/immutability */
 /* eslint-disable react-hooks/preserve-manual-memoization */
 /* eslint-disable react-hooks/set-state-in-effect */
@@ -36,6 +37,7 @@ import {
   Home,
   Globe,
   ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -62,6 +64,8 @@ import type {
   FAQ,
   FAQCategory,
   FAQQuestion,
+  FAQAnswer,
+  FAQAnswerContentBlock,
 } from "@/src/application/faq/faq.types";
 import type {
   User as ExpertUser,
@@ -70,11 +74,19 @@ import type {
 
 type Sender = "bot" | "user";
 
+// Updated Message interface to support answer blocks
+interface FAQMessageBlock {
+  type: "paragraph" | "image";
+  text?: string;
+  image_url?: string;
+}
+
 interface Message {
   id: string;
   sender: Sender;
   text: string;
   images?: string[];
+  answerBlocks?: FAQMessageBlock[];
 }
 
 type FlowStep =
@@ -956,20 +968,64 @@ function getTranslation(
   return t[key];
 }
 
-// ... (MENTOR_STEPS, validation functions, storage keys remain the same)
+// ========== Helper to convert answer_description to FAQMessageBlock[] ==========
+const convertAnswerToBlocks = (
+  answer: any, // Use 'any' to bypass type checking temporarily
+  language: string,
+): FAQMessageBlock[] => {
+  const blocks: FAQMessageBlock[] = [];
 
-const MENTOR_STEPS: {
-  key: MentorFormStep;
-  labelKey: keyof Translations;
-  icon: JSX.Element;
-}[] = [
-  { key: "name", labelKey: "name", icon: <User size={12} /> },
-  { key: "mobile", labelKey: "mobile", icon: <Phone size={12} /> },
-  { key: "email", labelKey: "email", icon: <Mail size={12} /> },
-];
+  if (answer.answer_description && Array.isArray(answer.answer_description)) {
+    for (const block of answer.answer_description) {
+      if (block.type === "paragraph") {
+        // Handle both 'text' and 'content' field names
+        const content = block.text || block.content;
+        const text = getLocalizedText(content, language);
+
+        if (text) {
+          blocks.push({
+            type: "paragraph",
+            text,
+          });
+        }
+      } else if (block.type === "image" && block.image_url) {
+        blocks.push({
+          type: "image",
+          image_url: block.image_url,
+        });
+      }
+    }
+    return blocks;
+  }
+
+  return blocks;
+};
+
+// ========== Helper to get all answer blocks from a question ==========
+const getAllAnswerBlocks = (
+  question: FAQQuestion,
+  language: string,
+): FAQMessageBlock[] => {
+  const answers = question.answers || [];
+  const allBlocks: FAQMessageBlock[] = [];
+
+  for (const answer of answers) {
+    const blocks = convertAnswerToBlocks(answer, language);
+    allBlocks.push(...blocks);
+  }
+
+  return allBlocks;
+};
+
+// ========== Helper to get plain text from answer blocks ==========
+const getPlainTextFromBlocks = (blocks: FAQMessageBlock[]): string => {
+  return blocks
+    .filter((block) => block.type === "paragraph")
+    .map((block) => block.text || "")
+    .join("\n\n");
+};
 
 // ========== VALIDATION FUNCTIONS ==========
-
 const isValidName = (value: string) => {
   const name = value.trim();
   if (name.length < 3) return false;
@@ -1006,8 +1062,17 @@ const CONTACT_STORAGE_KEY = "nimobot_contact_details";
 const FAQ_TOPIC_STORAGE_KEY = "nimobot_selected_faq_topic";
 const LAUNCHER_SIZE = 84;
 
-// ... (LauncherBotVideo, NimoBotProfile, LanguageDropdown remain the same)
+const MENTOR_STEPS: {
+  key: MentorFormStep;
+  labelKey: keyof Translations;
+  icon: JSX.Element;
+}[] = [
+  { key: "name", labelKey: "name", icon: <User size={12} /> },
+  { key: "mobile", labelKey: "mobile", icon: <Phone size={12} /> },
+  { key: "email", labelKey: "email", icon: <Mail size={12} /> },
+];
 
+// ========== LauncherBotVideo ==========
 function LauncherBotVideo({ onClick }: { onClick: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1094,6 +1159,7 @@ function LauncherBotVideo({ onClick }: { onClick: () => void }) {
   );
 }
 
+// ========== NimoBotProfile ==========
 function NimoBotProfile() {
   return (
     <div className="cw-nimo-profile">
@@ -1106,6 +1172,7 @@ function NimoBotProfile() {
   );
 }
 
+// ========== LanguageDropdown ==========
 function LanguageDropdown({
   currentLanguage,
   onSelect,
@@ -1199,6 +1266,77 @@ function ImagePreviewModal({
   );
 }
 
+// ========== Message Renderer Component ==========
+function MessageRenderer({
+  message,
+  onImageClick,
+}: {
+  message: Message;
+  onImageClick: (url: string) => void;
+}) {
+  // If message has answerBlocks, render them in order
+  if (message.answerBlocks && message.answerBlocks.length > 0) {
+    return (
+      <div className="cw-message-blocks">
+        {message.answerBlocks.map((block, index) => {
+          if (block.type === "paragraph") {
+            return (
+              <div key={index} className="cw-message-paragraph">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                >
+                  {block.text || ""}
+                </ReactMarkdown>
+              </div>
+            );
+          }
+          if (block.type === "image" && block.image_url) {
+            return (
+              <div key={index} className="cw-message-image-wrapper">
+                <img
+                  src={block.image_url}
+                  alt={`Answer image ${index + 1}`}
+                  className="cw-message-image"
+                  onClick={() => onImageClick(block.image_url!)}
+                  loading="lazy"
+                />
+              </div>
+            );
+          }
+          return null;
+        })}
+      </div>
+    );
+  }
+
+  // Fallback: render as markdown with images
+  return (
+    <>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+      >
+        {message.text}
+      </ReactMarkdown>
+      {message.images && message.images.length > 0 && (
+        <div className="cw-bubble-images">
+          {message.images.map((img: string, idx: number) => (
+            <img
+              key={idx}
+              src={img}
+              alt={`Image ${idx + 1}`}
+              className="cw-bubble-image"
+              onClick={() => onImageClick(img)}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ========== ChatWidgetInner ==========
 function ChatWidgetInner() {
   const { faqs, loading: faqsLoading } = useFAQ();
   const {
@@ -1254,7 +1392,7 @@ function ChatWidgetInner() {
 
   const isEmbedded =
     typeof window !== "undefined" && window.self !== window.top;
-  const [isOpen, setIsOpen] = useState(isEmbedded);
+  const [isOpen, setIsOpen] = useState(false); // Start closed
   const [showLanguageSelector, setShowLanguageSelector] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -1318,6 +1456,7 @@ function ChatWidgetInner() {
     [selectedLanguage],
   );
 
+  // ====== Language initialization ======
   useEffect(() => {
     try {
       const savedLang = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -1347,6 +1486,7 @@ function ChatWidgetInner() {
     [changeLanguage],
   );
 
+  // ====== Contact storage ======
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(CONTACT_STORAGE_KEY);
@@ -1368,6 +1508,7 @@ function ChatWidgetInner() {
     } catch (err) {}
   }, []);
 
+  // ====== Conversation management ======
   useEffect(() => {
     if (!conversations || conversations.length === 0) {
       setHasActiveConversation(false);
@@ -1388,6 +1529,7 @@ function ChatWidgetInner() {
     }
   }, [conversations]);
 
+  // ====== Conversation ended notification ======
   useEffect(() => {
     if (flowStep !== "mentor-chat") {
       conversationEndedNotifiedRef.current = false;
@@ -1406,16 +1548,19 @@ function ChatWidgetInner() {
     }
   }, [selectedConversation?.status, flowStep]);
 
+  // ====== Scroll to bottom ======
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping, flowStep, chatbotMessages, mentorMessages]);
 
+  // ====== Cleanup ======
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, []);
 
+  // ====== Embedded widget messaging ======
   useEffect(() => {
     if (!isEmbedded) return;
     window.parent.postMessage(
@@ -1424,6 +1569,7 @@ function ChatWidgetInner() {
     );
   }, [isOpen, isEmbedded]);
 
+  // ====== Join/leave chat room ======
   useEffect(() => {
     const cid = selectedConversation?.conversation_generated_id;
     if (flowStep !== "mentor-chat" || !cid) return;
@@ -1434,8 +1580,14 @@ function ChatWidgetInner() {
     };
   }, [flowStep, selectedConversation?.conversation_generated_id]);
 
+  // ====== Push message with support for answer blocks ======
   const pushMessage = useCallback(
-    (sender: Sender, text: string, images?: string[]) => {
+    (
+      sender: Sender,
+      text: string,
+      images?: string[],
+      answerBlocks?: FAQMessageBlock[],
+    ) => {
       setMessages((prev) => [
         ...prev,
         {
@@ -1443,12 +1595,14 @@ function ChatWidgetInner() {
           sender,
           text,
           images,
+          answerBlocks,
         },
       ]);
     },
     [],
   );
 
+  // ====== Simulate typing ======
   const simulateTyping = useCallback(
     (text: string, delay = 550) => {
       if (typingTimeoutRef.current) {
@@ -1465,6 +1619,7 @@ function ChatWidgetInner() {
     [pushMessage],
   );
 
+  // ====== Contact form submission ======
   useEffect(() => {
     if (submitTrigger === 0 || hasSavedContact.current) return;
     let c = false;
@@ -1548,6 +1703,7 @@ function ChatWidgetInner() {
     };
   }, [querySubmitTrigger]);
 
+  // ====== Input handlers ======
   const handleNameInput = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
@@ -1659,6 +1815,7 @@ function ChatWidgetInner() {
     ts,
   ]);
 
+  // ====== Navigation handlers ======
   const handleStart = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setIsTyping(false);
@@ -1814,6 +1971,7 @@ function ChatWidgetInner() {
     ts,
   ]);
 
+  // ====== FAQ navigation ======
   const handleFaqSelect = useCallback(
     (faq: FAQ) => {
       setSelectedFAQ(faq);
@@ -1858,45 +2016,62 @@ function ChatWidgetInner() {
     [pushMessage, simulateTyping, ts, selectedLanguage],
   );
 
+  // ====== UPDATED: Question Selection Handler ======
   const handleQuestionSelect = useCallback(
     (q: FAQQuestion) => {
       setSelectedQuestion(q);
-      pushMessage(
-        "user",
-        getLocalizedText(q.question_text, selectedLanguage || "en"),
-      );
+      const language = selectedLanguage || "en";
+
+      // User selected question
+      pushMessage("user", getLocalizedText(q.question_text, language));
+
       const answers = q.answers || [];
-      if (answers.length > 0) {
-        const firstAnswer = answers[0];
-        const answerText = getLocalizedText(
-          firstAnswer.answer_text,
-          selectedLanguage || "en",
-        );
-        const answerImages = firstAnswer.answer_images || [];
-        if (answerImages.length > 0) {
-          pushMessage("bot", answerText, answerImages);
-        } else {
-          simulateTyping(answerText);
-        }
-        if (answers.length > 1) {
-          setTimeout(() => {
-            answers.slice(1).forEach((a) => {
-              const text = getLocalizedText(
-                a.answer_text,
-                selectedLanguage || "en",
-              );
-              const images = a.answer_images || [];
-              pushMessage("bot", text, images);
-            });
-          }, 600);
-        }
-      } else {
+
+      if (answers.length === 0) {
         simulateTyping(ts("noAnswerYet"));
+        return;
       }
+
+      // Process each answer
+      answers.forEach((answer, answerIndex) => {
+        // Convert answer to blocks using the new structure
+        const blocks = convertAnswerToBlocks(answer, language);
+
+        if (blocks.length === 0) {
+          return;
+        }
+
+        // Extract text for fallback
+        const answerText = blocks
+          .filter((block) => block.type === "paragraph")
+          .map((block) => block.text)
+          .filter(Boolean)
+          .join("\n\n");
+
+        const pushAnswer = () => {
+          pushMessage("bot", answerText, undefined, blocks);
+        };
+
+        // First answer gets typing animation
+        if (answerIndex === 0) {
+          setIsTyping(true);
+          typingTimeoutRef.current = setTimeout(() => {
+            setIsTyping(false);
+            pushAnswer();
+            typingTimeoutRef.current = null;
+          }, 550);
+        } else {
+          // Additional answers appear after the first one
+          setTimeout(() => {
+            pushAnswer();
+          }, answerIndex * 600);
+        }
+      });
     },
     [pushMessage, simulateTyping, ts, selectedLanguage],
   );
 
+  // ====== Other handlers (keep from original) ======
   const handleShowSatisfaction = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     pushMessage("user", ts("iNeedMoreHelp"));
@@ -2174,14 +2349,17 @@ function ChatWidgetInner() {
   const handleRaiseQueryFromEnd = useCallback(() => {
     handleStartQueryForm();
   }, [handleStartQueryForm]);
+
   const handleConversationSatisfied = useCallback(() => {
     pushMessage("user", ts("allGoodThanks"));
     simulateTyping(ts("wonderfulThanks"));
     setSatisfactionStage("closed");
   }, [pushMessage, simulateTyping, ts]);
+
   const handleExitChat = useCallback(() => {
     setIsOpen(false);
   }, []);
+
   const handleBackToHome = useCallback(() => {
     handleStart();
   }, [handleStart]);
@@ -2280,6 +2458,7 @@ function ChatWidgetInner() {
     },
     [validateQueryForm],
   );
+
   const handleSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2287,6 +2466,7 @@ function ChatWidgetInner() {
     },
     [flowStep, handleMentorFormSubmit],
   );
+
   const handleLiveChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2297,6 +2477,7 @@ function ChatWidgetInner() {
     },
     [chatbotQuestion, askQuestion],
   );
+
   const handleMentorChatSend = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
@@ -2360,6 +2541,7 @@ function ChatWidgetInner() {
       ] as FlowStep[]
     ).includes(flowStep);
 
+  // ====== Render resume banner ======
   const renderResumeBanner = (variant: "inline" | "standalone" = "inline") => {
     if (
       !hasActiveConversation ||
@@ -2395,6 +2577,7 @@ function ChatWidgetInner() {
     );
   };
 
+  // ====== Render content based on flow step ======
   const renderContent = () => {
     if (flowStep === "faq-list")
       return (
@@ -2548,31 +2731,44 @@ function ChatWidgetInner() {
               </div>
               {(selectedQuestion.answers || []).length > 0 ? (
                 <div className="cw-answer-list">
-                  {(selectedQuestion.answers || []).map((a, i) => (
-                    <div key={i} className="cw-answer-item">
-                      <p>
-                        {getLocalizedText(
-                          a.answer_text,
-                          selectedLanguage || "en",
-                        )}
-                      </p>
-                      {(a.answer_images || []).length > 0 && (
-                        <div className="cw-answer-images">
-                          {(a.answer_images || []).map(
-                            (img: string, idx: number) => (
-                              <img
-                                key={idx}
-                                src={img}
-                                alt={`Answer ${i + 1} image ${idx + 1}`}
-                                className="cw-answer-image-thumb"
-                                onClick={() => setPreviewImage(img)}
-                              />
-                            ),
-                          )}
+                  {(selectedQuestion.answers || []).map((a, i) => {
+                    const blocks = convertAnswerToBlocks(
+                      a,
+                      selectedLanguage || "en",
+                    );
+
+                    if (blocks.length > 0) {
+                      return (
+                        <div key={i} className="cw-answer-item">
+                          {blocks.map((block, bi) => (
+                            <div key={bi} className="cw-answer-block">
+                              {block.type === "paragraph" ? (
+                                <p>{block.text}</p>
+                              ) : (
+                                block.image_url && (
+                                  <img
+                                    src={block.image_url}
+                                    alt={`Answer ${i + 1} image ${bi + 1}`}
+                                    className="cw-answer-image-thumb"
+                                    onClick={() =>
+                                      setPreviewImage(block.image_url!)
+                                    }
+                                  />
+                                )
+                              )}
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    }
+
+                    // If no blocks found, show a fallback message
+                    return (
+                      <div key={i} className="cw-answer-item">
+                        <p>No content available</p>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="cw-answer-empty">{ts("noAnswerYet")}</p>
@@ -2593,6 +2789,7 @@ function ChatWidgetInner() {
         </div>
       );
     }
+    // ... (keep other flow steps from original code)
     if (flowStep === "mentor-form") {
       const ci = MENTOR_STEPS.findIndex((s) => s.key === mentorFormStep);
       return (
@@ -2983,6 +3180,7 @@ function ChatWidgetInner() {
     flowStep === "live-chat" ||
     flowStep === "mentor-chat";
 
+  // ====== Main render ======
   return (
     <div className="cw-root">
       <ImagePreviewModal
@@ -3117,27 +3315,10 @@ function ChatWidgetInner() {
                       className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"}`}
                     >
                       {m.sender === "bot" ? (
-                        <>
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                          >
-                            {m.text}
-                          </ReactMarkdown>
-                          {m.images && m.images.length > 0 && (
-                            <div className="cw-bubble-images">
-                              {m.images.map((img: string, idx: number) => (
-                                <img
-                                  key={idx}
-                                  src={img}
-                                  alt={`Image ${idx + 1}`}
-                                  className="cw-bubble-image"
-                                  onClick={() => setPreviewImage(img)}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </>
+                        <MessageRenderer
+                          message={m}
+                          onImageClick={setPreviewImage}
+                        />
                       ) : (
                         m.text
                       )}
