@@ -1038,6 +1038,44 @@ const getPlainTextFromBlocks = (blocks: FAQMessageBlock[]): string => {
     .join("\n\n");
 };
 
+// ========== Helper to reformat run-on numbered lists into real markdown lists ==========
+// FAQ answers authored in the CMS sometimes store an entire numbered list as
+// ONE paragraph string, e.g. "1. Core AWS Service Categories...2. The
+// foundational services include:...3. AWS Lambda...". Rendered as plain text
+// (or as a single markdown paragraph) this collapses into an unreadable
+// run-on block. This helper detects that pattern (2+ "N. " markers in the
+// same string) and rewrites it into a proper markdown ordered list — one
+// list item per number — so ReactMarkdown + remark-gfm renders it as a real
+// <ol>/<li> list. Text that doesn't contain multiple numbered markers is
+// left completely untouched.
+const formatParagraphText = (text: string): string => {
+  if (!text) return "";
+
+  const markerRegex = /(\d{1,2})\.\s+/g;
+  const matches = [...text.matchAll(markerRegex)];
+
+  // Need at least 2 numbered markers to treat this as a run-on list —
+  // a single "1. " at the start of a normal sentence should stay as-is.
+  if (matches.length < 2) return text;
+
+  const preamble = text.slice(0, matches[0].index).trim();
+
+  const items: string[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const marker = matches[i];
+    const contentStart = marker.index! + marker[0].length;
+    const contentEnd =
+      i + 1 < matches.length ? matches[i + 1].index! : text.length;
+    const itemText = text.slice(contentStart, contentEnd).trim();
+    if (itemText) items.push(`${marker[1]}. ${itemText}`);
+  }
+
+  if (items.length < 2) return text;
+
+  const listMarkdown = items.join("\n");
+  return preamble ? `${preamble}\n\n${listMarkdown}` : listMarkdown;
+};
+
 // ========== VALIDATION FUNCTIONS ==========
 const isValidName = (value: string) => {
   const name = value.trim();
@@ -1316,7 +1354,7 @@ function MessageRenderer({
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight]}
                 >
-                  {block.text || ""}
+                  {formatParagraphText(block.text || "")}
                 </ReactMarkdown>
               </div>
             );
@@ -1941,6 +1979,11 @@ function ChatWidgetInner() {
     ts,
   ]);
 
+  // ====== FAQ navigation ======
+  // These transitions are deliberately silent — no chat bubbles are pushed
+  // for browsing the FAQ list / categories / questions. The FAQ flow is a
+  // pure screen-to-screen navigation; conversational history is reserved
+  // for the actual "Chat with Nimo Bot" AI flow.
   const handleBack = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setIsTyping(false);
@@ -1950,14 +1993,10 @@ function ChatWidgetInner() {
       setFlowStep("faq-list");
       setSelectedFAQ(null);
       setSelectedCategory(null);
-      pushMessage("user", ts("back"));
-      simulateTyping(ts("hereAreFAQAgain"));
     } else if (flowStep === "faq-questions") {
       setFlowStep("faq-categories");
       setSelectedCategory(null);
       setSelectedQuestion(null);
-      pushMessage("user", ts("back"));
-      simulateTyping(ts("hereAreCategoriesAgain"));
     } else if (flowStep === "query-category") {
       resetRequestQueryForm();
       setSelectedQueryCategory(null);
@@ -2014,34 +2053,18 @@ function ChatWidgetInner() {
     ts,
   ]);
 
-  // ====== FAQ navigation ======
-  const handleFaqSelect = useCallback(
-    (faq: FAQ) => {
-      setSelectedFAQ(faq);
-      setSelectedCategory(null);
-      setSelectedQuestion(null);
-      setFlowStep("faq-categories");
-      pushMessage(
-        "user",
-        getLocalizedText(faq.faq_default_question, selectedLanguage || "en"),
-      );
-      (faq.categories || []).length > 0
-        ? simulateTyping(ts("hereAreCategories"))
-        : simulateTyping(ts("noCategoriesYet"));
-    },
-    [pushMessage, simulateTyping, ts, selectedLanguage],
-  );
+  const handleFaqSelect = useCallback((faq: FAQ) => {
+    setSelectedFAQ(faq);
+    setSelectedCategory(null);
+    setSelectedQuestion(null);
+    setFlowStep("faq-categories");
+  }, []);
 
   const handleCategorySelect = useCallback(
     (cat: FAQCategory) => {
       setSelectedCategory(cat);
       setSelectedQuestion(null);
       setFlowStep("faq-questions");
-      pushMessage(
-        "user",
-        getLocalizedText(cat.topic_name, selectedLanguage || "en") ||
-          ts("unknown"),
-      );
       try {
         window.localStorage.setItem(
           FAQ_TOPIC_STORAGE_KEY,
@@ -2052,54 +2075,17 @@ function ChatWidgetInner() {
           }),
         );
       } catch (err) {}
-      (cat.questions || []).length > 0
-        ? simulateTyping(ts("hereAreQuestions"))
-        : simulateTyping(ts("noQuestionsYet"));
     },
-    [pushMessage, simulateTyping, ts, selectedLanguage],
+    [selectedLanguage],
   );
 
   // ====== Question Selection Handler ======
-  // Shows exactly ONE bot answer per question — the latest revision — laid
-  // out as a clean article (heading-free prose + full-width images), instead
-  // of looping through every stored answer and stacking multiple bubbles.
-  // const handleQuestionSelect = useCallback(
-  //   (q: FAQQuestion) => {
-  //     setSelectedQuestion(q);
-  //     const language = selectedLanguage || "en";
-
-  //     // User selected question
-  //     pushMessage("user", getLocalizedText(q.question_text, language));
-
-  //     const blocks = getLatestAnswerBlocks(q, language);
-
-  //     if (blocks.length === 0) {
-  //       simulateTyping(ts("noAnswerYet"));
-  //       return;
-  //     }
-
-  //     const answerText = getPlainTextFromBlocks(blocks);
-
-  //     setIsTyping(true);
-  //     typingTimeoutRef.current = setTimeout(() => {
-  //       setIsTyping(false);
-  //       pushMessage("bot", answerText, undefined, blocks);
-  //       typingTimeoutRef.current = null;
-  //     }, 550);
-  //   },
-  //   [pushMessage, simulateTyping, ts, selectedLanguage],
-  // );
-  const handleQuestionSelect = useCallback(
-    (q: FAQQuestion) => {
-      setSelectedQuestion(q);
-
-      const language = selectedLanguage || "en";
-
-      // Only add the selected question to chat
-      pushMessage("user", getLocalizedText(q.question_text, language));
-    },
-    [pushMessage, selectedLanguage],
-  );
+  // Selecting a question only reveals its answer inline (see renderContent
+  // for "faq-questions"). No chat bubble is pushed — the FAQ flow shows
+  // screens directly, without a conversational history trail.
+  const handleQuestionSelect = useCallback((q: FAQQuestion) => {
+    setSelectedQuestion(q);
+  }, []);
 
   // ====== Other handlers (keep from original) ======
   const handleShowSatisfaction = useCallback(() => {
@@ -2571,48 +2557,17 @@ function ChatWidgetInner() {
       ] as FlowStep[]
     ).includes(flowStep);
 
-  // ====== Render resume banner ======
-  const renderResumeBanner = (variant: "inline" | "standalone" = "inline") => {
-    if (
-      !hasActiveConversation ||
-      !selectedConversation ||
-      selectedConversation.status === "CLOSED"
-    )
-      return null;
-    return (
-      <button
-        className={`cw-resume-banner ${variant === "inline" ? "cw-resume-banner--inline" : ""}`}
-        onClick={handleResumeConversation}
-        type="button"
-      >
-        <span className="cw-resume-banner-icon">
-          <MessageSquare size={16} />
-        </span>
-        <span className="cw-resume-banner-text">
-          <span className="cw-resume-banner-title">
-            {ts("youHaveActiveConversation")}
-          </span>
-          <span className="cw-resume-banner-sub">
-            {selectedConversation.category_name
-              ? (t("aboutTopic") as (topic: string) => string)(
-                  selectedConversation.category_name,
-                )
-              : ts("tapToResume")}
-          </span>
-        </span>
-        <span className="cw-resume-banner-arrow">
-          <ArrowLeft size={14} style={{ transform: "rotate(180deg)" }} />
-        </span>
-      </button>
-    );
-  };
+  // Note: the "Talk to a Mentor" entry point has been removed from the UI
+  // (see mentor-options in renderContent below). The resume-conversation
+  // banner is intentionally not rendered anywhere anymore for the same
+  // reason — with no entry point into mentor chat there's nothing for it
+  // to usefully resume into.
 
   // ====== Render content based on flow step ======
   const renderContent = () => {
     if (flowStep === "faq-list")
       return (
         <div className="cw-faqlist-wrap">
-          {renderResumeBanner("inline")}
           <div className="cw-section-title">
             <span className="cw-section-icon">
               <MessageSquare size={15} />
@@ -2770,7 +2725,12 @@ function ChatWidgetInner() {
                       {blocks.map((block, bi) =>
                         block.type === "paragraph" ? (
                           <div key={bi} className="cw-article-paragraph">
-                            <p>{block.text}</p>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeHighlight]}
+                            >
+                              {formatParagraphText(block.text || "")}
+                            </ReactMarkdown>
                           </div>
                         ) : (
                           block.image_url && (
@@ -2871,7 +2831,6 @@ function ChatWidgetInner() {
               {ts("notYou")}
             </button>
           </div>
-          {renderResumeBanner("standalone")}
           <button
             className="cw-option-btn cw-option-chat"
             onClick={handleChatWithBot}
@@ -2883,19 +2842,6 @@ function ChatWidgetInner() {
             <div className="cw-option-text">
               <span className="cw-option-label">{ts("chatWithBot")}</span>
               <span className="cw-option-desc">{ts("chatWithBotDesc")}</span>
-            </div>
-          </button>
-          <button
-            className="cw-option-btn cw-option-mentor"
-            onClick={handleShowMentorTopics}
-            type="button"
-          >
-            <div className="cw-option-icon">
-              <Users size={20} />
-            </div>
-            <div className="cw-option-text">
-              <span className="cw-option-label">{ts("talkToMentor")}</span>
-              <span className="cw-option-desc">{ts("talkToMentorDesc")}</span>
             </div>
           </button>
           <button
@@ -3209,6 +3155,12 @@ function ChatWidgetInner() {
     flowStep === "live-chat" ||
     flowStep === "mentor-chat";
 
+  // Chat-bubble history is only meaningful for the actual "Chat with Nimo
+  // Bot" AI conversation — every other flow (FAQ browsing, contact form,
+  // raise-a-query, options, etc.) is presented as a direct screen without a
+  // stacked message trail.
+  const showConversationHistory = flowStep === "live-chat";
+
   // ====== Main render ======
   return (
     <div className="cw-root">
@@ -3337,34 +3289,35 @@ function ChatWidgetInner() {
                 </div>
               </div>
               <div className="cw-messages" aria-live="polite">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
-                  >
+                {showConversationHistory &&
+                  messages.map((m) => (
                     <div
-                      className={`cw-avatar ${m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"}`}
+                      key={m.id}
+                      className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
                     >
-                      {m.sender === "bot" ? (
-                        <Bot size={13} />
-                      ) : (
-                        <User size={12} />
-                      )}
+                      <div
+                        className={`cw-avatar ${m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"}`}
+                      >
+                        {m.sender === "bot" ? (
+                          <Bot size={13} />
+                        ) : (
+                          <User size={12} />
+                        )}
+                      </div>
+                      <div
+                        className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"} ${m.answerBlocks && m.answerBlocks.length > 0 ? "cw-bubble--article" : ""}`}
+                      >
+                        {m.sender === "bot" ? (
+                          <MessageRenderer
+                            message={m}
+                            onImageClick={setPreviewImage}
+                          />
+                        ) : (
+                          m.text
+                        )}
+                      </div>
                     </div>
-                    <div
-                      className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"} ${m.answerBlocks && m.answerBlocks.length > 0 ? "cw-bubble--article" : ""}`}
-                    >
-                      {m.sender === "bot" ? (
-                        <MessageRenderer
-                          message={m}
-                          onImageClick={setPreviewImage}
-                        />
-                      ) : (
-                        m.text
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ))}
                 {flowStep === "live-chat" &&
                   chatbotMessages.map((cm, i) => (
                     <div
@@ -3517,10 +3470,7 @@ function ChatWidgetInner() {
                   </>
                 )}
                 {renderContent()}
-                {(isTyping ||
-                  (flowStep === "live-chat" && chatbotLoading) ||
-                  (flowStep === "mentor-topics" && expertsLoading) ||
-                  (flowStep === "query-category" && expertsLoading)) && (
+                {showConversationHistory && (isTyping || chatbotLoading) && (
                   <div className="cw-msg">
                     <div className="cw-avatar cw-avatar--bot">
                       <Bot size={13} />
