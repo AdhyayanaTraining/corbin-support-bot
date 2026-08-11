@@ -296,6 +296,31 @@ body {
   stroke: #fff !important;
 }
 
+/* ---- header language selector close button ---- */
+.cw-header-close-language {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+.cw-header-close-language:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+.cw-header-close-language svg {
+  width: 16px;
+  height: 16px;
+  color: #fff !important;
+  stroke: #fff !important;
+}
+
 /* ---- messages ---- */
 .cw-messages {
   flex: 1;
@@ -1556,6 +1581,7 @@ body {
   align-items: center;
   height: 100%;
   animation: cw-fade-in 0.4s ease both;
+  position: relative;
 }
 
 @keyframes cw-fade-in {
