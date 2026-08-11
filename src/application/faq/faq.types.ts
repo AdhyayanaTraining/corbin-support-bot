@@ -1,9 +1,9 @@
 // ======================================================
-// FAQ Types
+// FAQ TYPES
 // ======================================================
 
 // ======================================================
-// Localized Text
+// LOCALIZED TEXT
 // ======================================================
 
 export interface LocalizedText {
@@ -15,39 +15,68 @@ export interface LocalizedText {
 }
 
 // ======================================================
-// FAQ Answer
+// FAQ ANSWER CONTENT BLOCK
+// ======================================================
+
+export interface FAQAnswerParagraphBlock {
+  type: "paragraph";
+  text: LocalizedText;
+}
+
+export interface FAQAnswerImageBlock {
+  type: "image";
+  image_url: string;
+}
+
+export type FAQAnswerContentBlock =
+  | FAQAnswerParagraphBlock
+  | FAQAnswerImageBlock;
+
+// ======================================================
+// FAQ ANSWER
 // ======================================================
 
 export interface FAQAnswer {
   answer_generated_id?: string;
-  answer_text: LocalizedText;
-  answer_images?: string[]; // Added: Array of image URLs/base64 strings
+
+  answer_description: FAQAnswerContentBlock[];
+
   created_by: string;
+
   created_at?: string;
 }
 
 // ======================================================
-// FAQ Question
+// FAQ QUESTION
 // ======================================================
 
 export interface FAQQuestion {
   question_generated_id?: string;
+
   question_text: LocalizedText;
+
   answers: FAQAnswer[];
+
   created_by: string;
+
   created_at?: string;
 }
 
 // ======================================================
-// FAQ Category
+// FAQ CATEGORY
 // ======================================================
 
 export interface FAQCategory {
   category_generated_id?: string;
+
   topic_generated_id: string;
+
   topic_name: LocalizedText;
+
   questions: FAQQuestion[];
+
   created_by: string;
+
   created_at?: string;
 }
 
@@ -57,25 +86,32 @@ export interface FAQCategory {
 
 export interface FAQ {
   faq_generated_id: string;
+
   faq_default_question: LocalizedText;
+
   categories: FAQCategory[];
+
   isActiveFAQ: boolean;
+
   faq_created_by: string;
+
   faq_created_at: string;
+
   faq_updated_at?: string;
 }
 
 // ======================================================
-// Create FAQ Payload
+// CREATE FAQ PAYLOAD
 // ======================================================
 
 export interface CreateFAQPayload {
   faq_default_question: string;
+
   faq_created_by: string;
 }
 
 // ======================================================
-// Update FAQ Payload
+// UPDATE FAQ PAYLOAD
 // ======================================================
 
 export interface UpdateFAQPayload {
@@ -83,16 +119,17 @@ export interface UpdateFAQPayload {
 }
 
 // ======================================================
-// Create Question Payload
+// CREATE QUESTION PAYLOAD
 // ======================================================
 
 export interface CreateFAQQuestionPayload {
   question_text: string;
+
   created_by?: string;
 }
 
 // ======================================================
-// Update Question Payload
+// UPDATE QUESTION PAYLOAD
 // ======================================================
 
 export interface UpdateFAQQuestionPayload {
@@ -100,29 +137,53 @@ export interface UpdateFAQQuestionPayload {
 }
 
 // ======================================================
-// Create Answer Payload
+// CREATE ANSWER CONTENT BLOCKS
+// ======================================================
+
+// Frontend sends plain English text.
+// Backend handles translation.
+
+export interface CreateFAQAnswerParagraphBlock {
+  type: "paragraph";
+  text: string;
+  content?: LocalizedText;
+}
+
+export interface CreateFAQAnswerImageBlock {
+  type: "image";
+  image_url: string;
+}
+
+export type CreateFAQAnswerContentBlock =
+  | CreateFAQAnswerParagraphBlock
+  | CreateFAQAnswerImageBlock;
+
+// ======================================================
+// CREATE ANSWER PAYLOAD
 // ======================================================
 
 export interface CreateFAQAnswerPayload {
-  answer_text: string;
-  answer_images?: string[]; // Added: Optional array of image strings
+  answer_description: CreateFAQAnswerContentBlock[];
+
   created_by?: string;
 }
 
 // ======================================================
-// Update Answer Payload
+// UPDATE ANSWER PAYLOAD
 // ======================================================
 
 export interface UpdateFAQAnswerPayload {
-  answer_text?: string;
-  answer_images?: string[]; // Added: Optional array of image strings
+  answer_description?: CreateFAQAnswerContentBlock[];
+
+  created_by?: string;
 }
 
 // ======================================================
-// Empty FAQ
+// EMPTY FAQ
 // ======================================================
 
 export const EMPTY_FAQ: CreateFAQPayload = {
   faq_default_question: "",
+
   faq_created_by: "admin",
 };

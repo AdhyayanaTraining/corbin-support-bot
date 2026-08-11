@@ -89,6 +89,8 @@
       "max-height": BUBBLE_SIZE.height,
       "min-width": BUBBLE_SIZE.width,
       "min-height": BUBBLE_SIZE.height,
+      "border-radius": "50%",
+      "box-shadow": "0 4px 20px rgba(0, 0, 0, 0.15)",
     });
   }
 
@@ -105,6 +107,8 @@
         "max-height": MOBILE_PANEL_SIZE.height,
         "min-width": MOBILE_PANEL_SIZE.width,
         "min-height": MOBILE_PANEL_SIZE.height,
+        "border-radius": "0",
+        "box-shadow": "none",
       });
     } else {
       applyBoxStyles({
@@ -118,12 +122,15 @@
         "max-height": PANEL_SIZE.height,
         "min-width": PANEL_SIZE.width,
         "min-height": PANEL_SIZE.height,
+        "border-radius": "16px",
+        "box-shadow": "0 20px 60px rgba(0, 0, 0, 0.2)",
       });
     }
   }
 
   // =====================================================
   // BASE STYLE (applied once, before mount)
+  // IMPORTANT: Starts in BUBBLE (minimized) state
   // =====================================================
 
   applyBoxStyles({
@@ -140,8 +147,10 @@
     display: "block",
     visibility: "visible",
     opacity: "1",
+    "border-radius": "50%",
+    "box-shadow": "0 4px 20px rgba(0, 0, 0, 0.15)",
     transition:
-      "width .25s ease,height .25s ease,right .25s ease,bottom .25s ease",
+      "width .35s cubic-bezier(0.4, 0, 0.2, 1), height .35s cubic-bezier(0.4, 0, 0.2, 1), right .35s cubic-bezier(0.4, 0, 0.2, 1), bottom .35s cubic-bezier(0.4, 0, 0.2, 1), border-radius .35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .35s cubic-bezier(0.4, 0, 0.2, 1)",
   });
 
   // =====================================================
@@ -171,8 +180,11 @@
   // =====================================================
 
   window.addEventListener("resize", function () {
-    if (iframe.style.width === BUBBLE_SIZE.width) return;
-    setPanelBox();
+    // Only resize if currently in panel (open) state
+    var isPanel = iframe.style.width !== BUBBLE_SIZE.width;
+    if (isPanel) {
+      setPanelBox();
+    }
   });
 
   // =====================================================
@@ -181,7 +193,7 @@
 
   function mount() {
     document.body.appendChild(iframe);
-    console.log("Nimo Bot Widget Loaded");
+    console.log("Nimo Bot Widget Loaded - Minimized by default");
   }
 
   if (document.body) {
