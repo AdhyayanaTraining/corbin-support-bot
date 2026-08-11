@@ -1,17 +1,39 @@
+/* ==========================================================
+   EMBED TRANSPARENT DOCUMENT
+   ========================================================== */
+
+html,
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+body {
+  background-color: transparent !important;
+}
+
 /* ============================================
    CHAT WIDGET STYLES - Nimo Bot · GoldCrest.Ai LMS
    ============================================ */
 
 .cw-root {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 999999;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 14px;
+  justify-content: flex-end;
+  gap: 0;
   font-family: "Outfit", "Poppins", sans-serif;
+  background: transparent !important;
+  pointer-events: none;
 
   /* ---- refined navy / gold identity ---- */
   --cw-primary: #0e2749;
@@ -40,10 +62,12 @@
 }
 
 /* ============ LAUNCHER ============ */
-/* Launcher fills the iframe - loader controls the actual size */
 .cw-launcher {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 130px;
+  height: 130px;
   background: transparent !important;
   border: none;
   padding: 0;
@@ -51,12 +75,12 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  position: relative;
   filter: drop-shadow(0 8px 16px rgba(9, 25, 49, 0.35));
   transition: transform 0.25s ease;
+  pointer-events: auto;
 }
 .cw-launcher:hover {
-  transform: translateY(-2px) scale(1.05);
+  transform: translateY(-1px) scale(1.02);
 }
 .cw-launcher:active {
   transform: scale(0.96);
@@ -82,10 +106,12 @@
 
 /* ============ PANEL ============ */
 .cw-panel {
-  width: 396px;
-  max-width: calc(100vw - 40px);
-  height: 644px;
-  max-height: calc(100vh - 120px);
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
   background: var(--cw-bg) !important;
   border-radius: 22px;
   box-shadow: var(--cw-shadow-lg);
@@ -95,6 +121,7 @@
   flex-direction: column;
   transform-origin: bottom right;
   animation: cw-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  pointer-events: auto;
 }
 @keyframes cw-pop {
   from {
@@ -1894,18 +1921,20 @@
     margin-bottom: 28px;
   }
 }
+
 /* ============ RESPONSIVE - Mobile ============ */
 @media (max-width: 480px) {
   .cw-root {
-    bottom: 16px;
-    right: 16px;
+    inset: 0;
+    align-items: stretch;
+    justify-content: stretch;
   }
+
   .cw-panel {
-    width: calc(100vw - 32px);
-    height: calc(100vh - 140px);
-    max-width: 100%;
-    border-radius: 20px;
+    border-radius: 0;
+    border: none;
   }
+
   .cw-header {
     padding: 14px 16px;
   }
@@ -1975,12 +2004,16 @@
   .cw-help-btn-sub {
     font-size: 11px;
   }
+
+  .cw-launcher {
+    width: 100px;
+    height: 100px;
+  }
 }
 
 /* ============ RESPONSIVE - Tablet ============ */
 @media (min-width: 481px) and (max-width: 768px) {
   .cw-panel {
-    width: 380px;
-    height: 600px;
+    border-radius: 18px;
   }
 }
