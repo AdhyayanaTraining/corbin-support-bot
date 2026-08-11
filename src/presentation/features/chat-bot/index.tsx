@@ -38,6 +38,7 @@ import {
   Globe,
   ChevronDown,
   Image as ImageIcon,
+  ZoomIn,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -87,6 +88,7 @@ interface Message {
   text: string;
   images?: string[];
   answerBlocks?: FAQMessageBlock[];
+  isArticle?: boolean;
 }
 
 type FlowStep =
@@ -143,6 +145,7 @@ interface Translations {
   selectYourLanguage: string;
   choosePreferredLanguage: string;
   changeLanguageLabel: string;
+  closeChat: string;
   pickQuestion: string;
   categories: string;
   noCategoriesYet: string;
@@ -391,6 +394,7 @@ const translations: Record<SupportedLanguage, Translations> = {
     talkDifferentMentor: "Talk to a different mentor about something else",
     ongoingConversation: "You have an ongoing conversation",
     changeLanguageLabel: "Change Language",
+    closeChat: "Close chat",
   },
   hi: {
     welcomeMessage:
@@ -528,6 +532,7 @@ const translations: Record<SupportedLanguage, Translations> = {
     talkDifferentMentor: "किसी और चीज़ के बारे में दूसरे मेंटर से बात करें",
     ongoingConversation: "आपकी एक चल रही बातचीत है",
     changeLanguageLabel: "भाषा बदलें",
+    closeChat: "चैट बंद करें",
   },
   te: {
     welcomeMessage:
@@ -666,6 +671,7 @@ const translations: Record<SupportedLanguage, Translations> = {
     talkDifferentMentor: "వేరే దాని గురించి వేరే మెంటర్ తో మాట్లాడండి",
     ongoingConversation: "మీకు ఒక కొనసాగుతున్న సంభాషణ ఉంది",
     changeLanguageLabel: "భాష మార్చండి",
+    closeChat: "చాట్ మూసివేయండి",
   },
   ta: {
     welcomeMessage:
@@ -811,6 +817,7 @@ const translations: Record<SupportedLanguage, Translations> = {
     talkDifferentMentor: "வேறு ஏதாவது பற்றி வேறு வழிகாட்டியுடன் பேசுங்கள்",
     ongoingConversation: "உங்களுக்கு ஒரு நடந்துகொண்டிருக்கும் உரையாடல் உள்ளது",
     changeLanguageLabel: "மொழியை மாற்று",
+    closeChat: "அரட்டையை மூடு",
   },
   kn: {
     welcomeMessage:
@@ -949,6 +956,7 @@ const translations: Record<SupportedLanguage, Translations> = {
     talkDifferentMentor: "ಬೇರೆ ಯಾವುದೋ ಬಗ್ಗೆ ಬೇರೆ ಮಾರ್ಗದರ್ಶಕರೊಂದಿಗೆ ಮಾತನಾಡಿ",
     ongoingConversation: "ನಿಮಗೆ ಒಂದು ನಡೆಯುತ್ತಿರುವ ಸಂಭಾಷಣೆ ಇದೆ",
     changeLanguageLabel: "ಭಾಷೆ ಬದಲಾಯಿಸಿ",
+    closeChat: "ಚಾಟ್ ಮುಚ್ಚಿ",
   },
 };
 
@@ -1001,20 +1009,25 @@ const convertAnswerToBlocks = (
   return blocks;
 };
 
-// ========== Helper to get all answer blocks from a question ==========
-const getAllAnswerBlocks = (
+// ========== Helper to get the single most recent/authoritative answer ==========
+// A question can carry multiple stored answer revisions. We only ever want to
+// show ONE answer to the visitor (the latest one), never stack every revision
+// as separate chat bubbles — that was the source of the "double answer" bug.
+const getLatestAnswerBlocks = (
   question: FAQQuestion,
   language: string,
 ): FAQMessageBlock[] => {
   const answers = question.answers || [];
-  const allBlocks: FAQMessageBlock[] = [];
+  if (answers.length === 0) return [];
 
-  for (const answer of answers) {
-    const blocks = convertAnswerToBlocks(answer, language);
-    allBlocks.push(...blocks);
+  // Walk backwards and use the last answer entry that actually resolves to
+  // non-empty content. This guarantees we show the most recently added
+  // answer, and silently skip any trailing empty/placeholder revisions.
+  for (let i = answers.length - 1; i >= 0; i--) {
+    const blocks = convertAnswerToBlocks(answers[i], language);
+    if (blocks.length > 0) return blocks;
   }
-
-  return allBlocks;
+  return [];
 };
 
 // ========== Helper to get plain text from answer blocks ==========
@@ -1248,15 +1261,32 @@ function ImagePreviewModal({
   imageUrl: string | null;
   onClose: () => void;
 }) {
+  // Close on Escape key for accessibility / a second reliable way out.
+  useEffect(() => {
+    if (!imageUrl) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [imageUrl, onClose]);
+
   if (!imageUrl) return null;
 
   return (
-    <div className="cw-image-modal-overlay" onClick={onClose}>
+    <div
+      className="cw-image-modal-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+    >
       <div className="cw-image-modal" onClick={(e) => e.stopPropagation()}>
         <button
           className="cw-image-modal-close"
           onClick={onClose}
           type="button"
+          aria-label="Close image preview"
         >
           <X size={20} />
         </button>
@@ -1274,14 +1304,14 @@ function MessageRenderer({
   message: Message;
   onImageClick: (url: string) => void;
 }) {
-  // If message has answerBlocks, render them in order
+  // If message has answerBlocks, render them as a clean, article-style read.
   if (message.answerBlocks && message.answerBlocks.length > 0) {
     return (
-      <div className="cw-message-blocks">
+      <div className="cw-article">
         {message.answerBlocks.map((block, index) => {
           if (block.type === "paragraph") {
             return (
-              <div key={index} className="cw-message-paragraph">
+              <div key={index} className="cw-article-paragraph">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight]}
@@ -1293,15 +1323,24 @@ function MessageRenderer({
           }
           if (block.type === "image" && block.image_url) {
             return (
-              <div key={index} className="cw-message-image-wrapper">
-                <img
-                  src={block.image_url}
-                  alt={`Answer image ${index + 1}`}
-                  className="cw-message-image"
+              <figure key={index} className="cw-article-figure">
+                <button
+                  type="button"
+                  className="cw-article-image-btn"
                   onClick={() => onImageClick(block.image_url!)}
-                  loading="lazy"
-                />
-              </div>
+                  aria-label="Open image in full screen"
+                >
+                  <img
+                    src={block.image_url}
+                    alt={`Illustration ${index + 1}`}
+                    className="cw-article-image"
+                    loading="lazy"
+                  />
+                  <span className="cw-article-image-zoom">
+                    <ZoomIn size={14} />
+                  </span>
+                </button>
+              </figure>
             );
           }
           return null;
@@ -1870,6 +1909,10 @@ function ChatWidgetInner() {
     selectedLanguage,
   ]);
 
+  const handleCloseLanguageSelector = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
   const handleGoHome = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setIsTyping(false);
@@ -2016,59 +2059,46 @@ function ChatWidgetInner() {
     [pushMessage, simulateTyping, ts, selectedLanguage],
   );
 
-  // ====== UPDATED: Question Selection Handler ======
+  // ====== Question Selection Handler ======
+  // Shows exactly ONE bot answer per question — the latest revision — laid
+  // out as a clean article (heading-free prose + full-width images), instead
+  // of looping through every stored answer and stacking multiple bubbles.
+  // const handleQuestionSelect = useCallback(
+  //   (q: FAQQuestion) => {
+  //     setSelectedQuestion(q);
+  //     const language = selectedLanguage || "en";
+
+  //     // User selected question
+  //     pushMessage("user", getLocalizedText(q.question_text, language));
+
+  //     const blocks = getLatestAnswerBlocks(q, language);
+
+  //     if (blocks.length === 0) {
+  //       simulateTyping(ts("noAnswerYet"));
+  //       return;
+  //     }
+
+  //     const answerText = getPlainTextFromBlocks(blocks);
+
+  //     setIsTyping(true);
+  //     typingTimeoutRef.current = setTimeout(() => {
+  //       setIsTyping(false);
+  //       pushMessage("bot", answerText, undefined, blocks);
+  //       typingTimeoutRef.current = null;
+  //     }, 550);
+  //   },
+  //   [pushMessage, simulateTyping, ts, selectedLanguage],
+  // );
   const handleQuestionSelect = useCallback(
     (q: FAQQuestion) => {
       setSelectedQuestion(q);
+
       const language = selectedLanguage || "en";
 
-      // User selected question
+      // Only add the selected question to chat
       pushMessage("user", getLocalizedText(q.question_text, language));
-
-      const answers = q.answers || [];
-
-      if (answers.length === 0) {
-        simulateTyping(ts("noAnswerYet"));
-        return;
-      }
-
-      // Process each answer
-      answers.forEach((answer, answerIndex) => {
-        // Convert answer to blocks using the new structure
-        const blocks = convertAnswerToBlocks(answer, language);
-
-        if (blocks.length === 0) {
-          return;
-        }
-
-        // Extract text for fallback
-        const answerText = blocks
-          .filter((block) => block.type === "paragraph")
-          .map((block) => block.text)
-          .filter(Boolean)
-          .join("\n\n");
-
-        const pushAnswer = () => {
-          pushMessage("bot", answerText, undefined, blocks);
-        };
-
-        // First answer gets typing animation
-        if (answerIndex === 0) {
-          setIsTyping(true);
-          typingTimeoutRef.current = setTimeout(() => {
-            setIsTyping(false);
-            pushAnswer();
-            typingTimeoutRef.current = null;
-          }, 550);
-        } else {
-          // Additional answers appear after the first one
-          setTimeout(() => {
-            pushAnswer();
-          }, answerIndex * 600);
-        }
-      });
     },
-    [pushMessage, simulateTyping, ts, selectedLanguage],
+    [pushMessage, selectedLanguage],
   );
 
   // ====== Other handlers (keep from original) ======
@@ -2718,63 +2748,62 @@ function ChatWidgetInner() {
               ))}
             </div>
           )}
-          {selectedQuestion && (
-            <div className="cw-answer-box">
-              <div className="cw-answer-box-header">
-                <MessageSquare size={14} />
-                <span>
-                  {getLocalizedText(
-                    selectedQuestion.question_text,
-                    selectedLanguage || "en",
+          {selectedQuestion &&
+            (() => {
+              const blocks = getLatestAnswerBlocks(
+                selectedQuestion,
+                selectedLanguage || "en",
+              );
+              return (
+                <div className="cw-answer-box">
+                  <div className="cw-answer-box-header">
+                    <MessageSquare size={14} />
+                    <span>
+                      {getLocalizedText(
+                        selectedQuestion.question_text,
+                        selectedLanguage || "en",
+                      )}
+                    </span>
+                  </div>
+                  {blocks.length > 0 ? (
+                    <div className="cw-article cw-article--inline">
+                      {blocks.map((block, bi) =>
+                        block.type === "paragraph" ? (
+                          <div key={bi} className="cw-article-paragraph">
+                            <p>{block.text}</p>
+                          </div>
+                        ) : (
+                          block.image_url && (
+                            <figure key={bi} className="cw-article-figure">
+                              <button
+                                type="button"
+                                className="cw-article-image-btn"
+                                onClick={() =>
+                                  setPreviewImage(block.image_url!)
+                                }
+                                aria-label="Open image in full screen"
+                              >
+                                <img
+                                  src={block.image_url}
+                                  alt={`Illustration ${bi + 1}`}
+                                  className="cw-article-image"
+                                  loading="lazy"
+                                />
+                                <span className="cw-article-image-zoom">
+                                  <ZoomIn size={14} />
+                                </span>
+                              </button>
+                            </figure>
+                          )
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <p className="cw-answer-empty">{ts("noAnswerYet")}</p>
                   )}
-                </span>
-              </div>
-              {(selectedQuestion.answers || []).length > 0 ? (
-                <div className="cw-answer-list">
-                  {(selectedQuestion.answers || []).map((a, i) => {
-                    const blocks = convertAnswerToBlocks(
-                      a,
-                      selectedLanguage || "en",
-                    );
-
-                    if (blocks.length > 0) {
-                      return (
-                        <div key={i} className="cw-answer-item">
-                          {blocks.map((block, bi) => (
-                            <div key={bi} className="cw-answer-block">
-                              {block.type === "paragraph" ? (
-                                <p>{block.text}</p>
-                              ) : (
-                                block.image_url && (
-                                  <img
-                                    src={block.image_url}
-                                    alt={`Answer ${i + 1} image ${bi + 1}`}
-                                    className="cw-answer-image-thumb"
-                                    onClick={() =>
-                                      setPreviewImage(block.image_url!)
-                                    }
-                                  />
-                                )
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }
-
-                    // If no blocks found, show a fallback message
-                    return (
-                      <div key={i} className="cw-answer-item">
-                        <p>No content available</p>
-                      </div>
-                    );
-                  })}
                 </div>
-              ) : (
-                <p className="cw-answer-empty">{ts("noAnswerYet")}</p>
-              )}
-            </div>
-          )}
+              );
+            })()}
           <button
             className="cw-help-btn"
             onClick={handleShowSatisfaction}
@@ -3202,6 +3231,15 @@ function ChatWidgetInner() {
                     <span>{ts("choosePreferredLanguage")}</span>
                   </div>
                 </div>
+                <button
+                  className="cw-header-close-language"
+                  onClick={handleCloseLanguageSelector}
+                  type="button"
+                  aria-label={ts("closeChat")}
+                  title={ts("closeChat")}
+                >
+                  <X size={16} />
+                </button>
               </div>
               <div className="cw-messages">
                 <div className="cw-language-selector">
@@ -3291,6 +3329,8 @@ function ChatWidgetInner() {
                     className="cw-close-btn"
                     onClick={() => setIsOpen(false)}
                     type="button"
+                    aria-label={ts("closeChat")}
+                    title={ts("closeChat")}
                   >
                     <X size={16} />
                   </button>
@@ -3312,7 +3352,7 @@ function ChatWidgetInner() {
                       )}
                     </div>
                     <div
-                      className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"}`}
+                      className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"} ${m.answerBlocks && m.answerBlocks.length > 0 ? "cw-bubble--article" : ""}`}
                     >
                       {m.sender === "bot" ? (
                         <MessageRenderer

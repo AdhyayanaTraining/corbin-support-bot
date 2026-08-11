@@ -61,6 +61,25 @@ body {
   --cw-shadow-lg: 0 22px 60px rgba(9, 25, 49, 0.22);
 }
 
+/* Respect reduced-motion preferences across the whole widget */
+@media (prefers-reduced-motion: reduce) {
+  .cw-root * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible keyboard focus states for accessibility */
+.cw-root button:focus-visible,
+.cw-root input:focus-visible,
+.cw-root textarea:focus-visible,
+.cw-root a:focus-visible {
+  outline: 2px solid var(--cw-gold);
+  outline-offset: 2px;
+}
+
 /* ============ LAUNCHER ============ */
 .cw-launcher {
   position: absolute;
@@ -310,9 +329,13 @@ body {
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.2s ease;
+  margin-left: auto;
 }
 .cw-header-close-language:hover {
   background: rgba(255, 255, 255, 0.2) !important;
+}
+.cw-header-close-language:active {
+  transform: scale(0.94);
 }
 .cw-header-close-language svg {
   width: 16px;
@@ -407,6 +430,15 @@ body {
   border-bottom-right-radius: 4px;
   box-shadow: 0 4px 14px rgba(11, 34, 69, 0.25);
 }
+
+/* Bot bubbles that carry a full FAQ answer read like a small article card:
+   more breathing room, a touch wider, and no forced max-width squeeze on
+   images. */
+.cw-bubble--article {
+  max-width: 305px;
+  padding: 14px 15px 15px;
+}
+
 .cw-typing {
   display: flex;
   gap: 4px;
@@ -681,13 +713,14 @@ body {
   }
 }
 
-/* ============ ANSWER BOX ============ */
+/* ============ ANSWER BOX (inline article preview under the FAQ list) ============ */
 .cw-answer-box {
   margin-top: 12px;
-  padding: 15px 17px;
-  background: var(--cw-primary-tint);
-  border: 1px solid rgba(14, 39, 73, 0.12);
-  border-radius: 13px;
+  padding: 16px 17px 18px;
+  background: #ffffff;
+  border: 1px solid var(--cw-border);
+  border-radius: 14px;
+  box-shadow: var(--cw-shadow-sm);
   animation: cw-msg-in 0.3s ease both;
 }
 .cw-answer-box-header {
@@ -697,29 +730,14 @@ body {
   font-size: 13px;
   font-weight: 700;
   color: var(--cw-primary);
-  margin-bottom: 10px;
-  padding-bottom: 9px;
-  border-bottom: 1px solid rgba(14, 39, 73, 0.1);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--cw-border);
 }
 .cw-answer-box-header svg {
-  color: var(--cw-primary);
+  color: var(--cw-gold-strong);
   flex-shrink: 0;
   margin-top: 1px;
-}
-.cw-answer-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.cw-answer-item {
-  margin: 0;
-  padding: 9px 12px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: #334155;
-  background: #ffffff;
-  border-radius: 9px;
-  border-left: 3px solid var(--cw-gold);
 }
 .cw-answer-empty {
   font-size: 12px;
@@ -727,6 +745,82 @@ body {
   font-style: italic;
   margin: 0;
   padding: 8px 0;
+}
+
+/* ============ ARTICLE-STYLE ANSWER RENDERING ============
+   Used for both the FAQ answer bubble in chat and the inline answer
+   preview beneath the question list. A single flowing read: readable
+   line length, generous leading, and full-width, rounded images that sit
+   naturally between paragraphs — like a small editorial article rather
+   than a stack of disconnected chat bubbles. */
+.cw-article {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cw-article--inline {
+  gap: 14px;
+}
+.cw-article-paragraph {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--cw-text);
+}
+.cw-article--inline .cw-article-paragraph {
+  font-size: 13px;
+  line-height: 1.75;
+  color: #334155;
+}
+.cw-article-paragraph p {
+  margin: 0 0 10px;
+}
+.cw-article-paragraph p:last-child {
+  margin-bottom: 0;
+}
+.cw-article-figure {
+  margin: 2px 0;
+}
+.cw-article-image-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--cw-border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--cw-bg-soft);
+  position: relative;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.cw-article-image-btn:hover {
+  box-shadow: var(--cw-shadow-md);
+  transform: translateY(-1px);
+}
+.cw-article-image-btn:active {
+  transform: scale(0.99);
+}
+.cw-article-image {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 11px;
+}
+.cw-article-image-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(9, 25, 49, 0.65);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
 }
 
 /* ============ HELP BUTTON (Clear, noticeable option) ============ */
@@ -748,6 +842,7 @@ body {
   gap: 12px;
   text-align: left;
   box-shadow: 0 2px 8px rgba(31, 181, 114, 0.08);
+  margin-top: 14px;
 }
 .cw-help-btn-icon {
   flex-shrink: 0;
@@ -1713,6 +1808,11 @@ body {
   overflow: hidden;
 }
 /* ============ IMAGE PREVIEW MODAL ============ */
+/* NOTE: the widget root has pointer-events:none so only elements that
+   opt back in with pointer-events:auto are clickable. The modal renders
+   as a sibling of .cw-panel (not inside it), so it MUST re-enable
+   pointer-events itself — otherwise the overlay and its close (X) button
+   are visible but completely unclickable. */
 .cw-image-modal-overlay {
   position: fixed;
   inset: 0;
@@ -1720,9 +1820,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 1000000;
   padding: 20px;
   animation: cw-fade-in 0.2s ease;
+  pointer-events: auto;
 }
 
 .cw-image-modal {
@@ -1732,6 +1833,7 @@ body {
   border-radius: 12px;
   overflow: hidden;
   animation: cw-pop 0.2s ease;
+  pointer-events: auto;
 }
 
 .cw-image-modal-close {
@@ -1749,11 +1851,17 @@ body {
   justify-content: center;
   cursor: pointer;
   z-index: 1;
-  transition: background 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+  pointer-events: auto;
 }
 
 .cw-image-modal-close:hover {
   background: rgba(0, 0, 0, 0.8);
+}
+.cw-image-modal-close:active {
+  transform: scale(0.92);
 }
 
 .cw-image-modal-img {
@@ -1763,7 +1871,7 @@ body {
   display: block;
 }
 
-/* ============ ANSWER IMAGES (in answer box) ============ */
+/* ============ ANSWER IMAGES (legacy support) ============ */
 .cw-answer-images {
   display: flex;
   flex-wrap: wrap;
@@ -1850,6 +1958,10 @@ body {
 
   .cw-bubble-images {
     gap: 4px;
+  }
+
+  .cw-article-image {
+    max-height: 200px;
   }
 }
 .cw-language-dropdown-item {
@@ -2012,6 +2124,9 @@ body {
   .cw-bubble {
     max-width: 230px;
     font-size: 13px;
+  }
+  .cw-bubble--article {
+    max-width: 260px;
   }
   .cw-input {
     font-size: 13px;
