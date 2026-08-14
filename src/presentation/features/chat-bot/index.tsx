@@ -1118,10 +1118,10 @@ const MENTOR_STEPS: {
   labelKey: keyof Translations;
   icon: JSX.Element;
 }[] = [
-  { key: "name", labelKey: "name", icon: <User size={12} /> },
-  { key: "mobile", labelKey: "mobile", icon: <Phone size={12} /> },
-  { key: "email", labelKey: "email", icon: <Mail size={12} /> },
-];
+    { key: "name", labelKey: "name", icon: <User size={12} /> },
+    { key: "mobile", labelKey: "mobile", icon: <Phone size={12} /> },
+    { key: "email", labelKey: "email", icon: <Mail size={12} /> },
+  ];
 
 // ========== LauncherBotVideo ==========
 function LauncherBotVideo({ onClick }: { onClick: () => void }) {
@@ -1180,7 +1180,7 @@ function LauncherBotVideo({ onClick }: { onClick: () => void }) {
       ctx.putImageData(frame, 0, 0);
     };
 
-    video.play().catch(() => {});
+    video.play().catch(() => { });
     rafRef.current = requestAnimationFrame(drawFrame);
 
     return () => {
@@ -1415,7 +1415,13 @@ function MessageRenderer({
 
 // ========== ChatWidgetInner ==========
 function ChatWidgetInner() {
-  const { faqs, loading: faqsLoading } = useFAQ();
+  const {
+    faqs,
+    loading: faqsLoading,
+    searchFAQs,
+    faqSearchLoading,
+    setLanguage: setFAQLanguage,
+  } = useFAQ();
   const {
     messages: chatbotMessages,
     question: chatbotQuestion,
@@ -1423,7 +1429,9 @@ function ChatWidgetInner() {
     loading: chatbotLoading,
     handleChange: handleChatbotChange,
     askQuestion,
+    addMessage,
     resetForm: resetChatbotForm,
+    clearQuestionInput,
     changeLanguage,
     selectedLanguage,
   } = useChatbot();
@@ -1539,28 +1547,31 @@ function ChatWidgetInner() {
       const savedLang = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (savedLang && LANGUAGES.some((l) => l.code === savedLang)) {
         changeLanguage(savedLang);
+        setFAQLanguage(savedLang);
         setShowLanguageSelector(false);
         const msg = (
           translations[savedLang as SupportedLanguage] || translations.en
         ).welcomeMessage;
         setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
       }
-    } catch (err) {}
+    } catch (err) { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLanguageSelect = useCallback(
     (languageCode: string) => {
       changeLanguage(languageCode);
+      setFAQLanguage(languageCode);
       setShowLanguageSelector(false);
       try {
         window.localStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
-      } catch (err) {}
+      } catch (err) { }
       const msg =
         translations[languageCode as SupportedLanguage]?.welcomeMessage ||
         translations.en.welcomeMessage;
       setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
     },
-    [changeLanguage],
+    [changeLanguage, setFAQLanguage],
   );
 
   // ====== Contact storage ======
@@ -1582,7 +1593,7 @@ function ChatWidgetInner() {
             getVisitorConversations(contact.registered_employee_generated_id);
         }
       }
-    } catch (err) {}
+    } catch (err) { }
   }, []);
 
   // ====== Conversation management ======
@@ -1745,7 +1756,7 @@ function ChatWidgetInner() {
     setSavedContact(updated);
     try {
       window.localStorage.setItem(CONTACT_STORAGE_KEY, JSON.stringify(updated));
-    } catch (err) {}
+    } catch (err) { }
     const thanksMsg = (t("thanksSaved") as (name: string) => string)(
       contact.name,
     );
@@ -2074,7 +2085,7 @@ function ChatWidgetInner() {
               getLocalizedText(cat.topic_name, selectedLanguage || "en") ?? "",
           }),
         );
-      } catch (err) {}
+      } catch (err) { }
     },
     [selectedLanguage],
   );
@@ -2132,7 +2143,7 @@ function ChatWidgetInner() {
     resetWebsiteUserForm();
     try {
       window.localStorage.removeItem(CONTACT_STORAGE_KEY);
-    } catch (err) {}
+    } catch (err) { }
     pushMessage("user", "Update my details");
     setMentorForm({
       name: "",
@@ -2224,16 +2235,25 @@ function ChatWidgetInner() {
     ts,
     t,
   ]);
-
   const handleChatWithBot = useCallback(() => {
     const c = savedContact ?? mentorForm;
-    pushMessage("user", ts("chatWithBot"));
-    const chatMsg = (t("youAreNowChatting") as (name: string) => string)(
-      c.name,
-    );
-    simulateTyping(chatMsg);
+
+    addMessage({
+      id: `${Date.now()}-user-${Math.random()}`,
+      role: "user",
+      content: ts("chatWithBot"),
+    });
+
+    addMessage({
+      id: `${Date.now()}-assistant-${Math.random()}`,
+      role: "assistant",
+      content: (t("youAreNowChatting") as (name: string) => string)(
+        c.name,
+      ),
+    });
+
     setFlowStep("live-chat");
-  }, [savedContact, mentorForm, pushMessage, simulateTyping, ts, t]);
+  }, [savedContact, mentorForm, addMessage, ts, t]);
 
   const handleShowMentorTopics = useCallback(async () => {
     pushMessage("user", ts("talkToMentor"));
@@ -2484,14 +2504,82 @@ function ChatWidgetInner() {
   );
 
   const handleLiveChatSend = useCallback(
-    (e?: FormEvent) => {
+    async (e?: FormEvent) => {
       e?.preventDefault();
+
       const message = chatbotQuestion.question?.trim();
+
       if (!message || !isValidChatMessage(message)) return;
+
       setLocalValidationErrors({});
-      askQuestion();
+
+      try {
+        // 1. Search FAQ
+        const matchedQuestion = await searchFAQs(
+          message,
+          selectedLanguage || "en",
+        );
+
+        console.log("========== FAQ DEBUG ==========");
+        console.log("Question:", message);
+        console.log("Language:", selectedLanguage || "en");
+        console.log("Matched Question:", matchedQuestion);
+        console.log("================================");
+
+        // 2. FAQ matched
+        if (matchedQuestion) {
+          const answerBlocks = getLatestAnswerBlocks(
+            matchedQuestion,
+            selectedLanguage || "en",
+          );
+
+          console.log("Answer Blocks:", answerBlocks);
+
+          if (answerBlocks.length > 0) {
+            addMessage({
+              id: `${Date.now()}-user-${Math.random()}`,
+              role: "user",
+              content: message,
+              source: "faq",
+            });
+
+            addMessage({
+              id: `${Date.now()}-assistant-${Math.random()}`,
+              role: "assistant",
+              content: getPlainTextFromBlocks(answerBlocks),
+              source: "faq",
+              answerBlocks,
+            });
+
+            console.log("========== FAQ MESSAGE ADDED ==========");
+            console.log("FAQ answer blocks:", answerBlocks);
+            console.log("FAQ plain text:", getPlainTextFromBlocks(answerBlocks));
+            console.log("========================================");
+
+            // resetChatbotForm();
+            clearQuestionInput();
+            return;
+          }
+        }
+
+        // 3. No FAQ → RAG
+        await askQuestion(message);
+
+      } catch (error) {
+        console.error("FAQ search failed:", error);
+
+        // FAQ failure → RAG
+        await askQuestion(message);
+      }
     },
-    [chatbotQuestion, askQuestion],
+    [
+      chatbotQuestion,
+      searchFAQs,
+      selectedLanguage,
+      addMessage,
+      resetChatbotForm,
+      askQuestion,
+    ],
   );
 
   const handleMentorChatSend = useCallback(
@@ -2515,14 +2603,14 @@ function ChatWidgetInner() {
       ? "Nimo Bot"
       : flowStep === "faq-categories"
         ? getLocalizedText(
-            selectedFAQ?.faq_default_question,
-            selectedLanguage || "en",
-          ) || ts("categories")
+          selectedFAQ?.faq_default_question,
+          selectedLanguage || "en",
+        ) || ts("categories")
         : flowStep === "faq-questions"
           ? getLocalizedText(
-              selectedCategory?.topic_name,
-              selectedLanguage || "en",
-            ) || ts("questions")
+            selectedCategory?.topic_name,
+            selectedLanguage || "en",
+          ) || ts("questions")
           : flowStep === "mentor-form"
             ? ts("contactSupport")
             : flowStep === "query-category"
@@ -2890,8 +2978,8 @@ function ChatWidgetInner() {
               <span className="cw-option-desc">
                 {(t("resumeConversationDesc") as (name: string) => string)(
                   autoSelectedExpert?.name ??
-                    selectedConversation?.category_name ??
-                    "your mentor",
+                  selectedConversation?.category_name ??
+                  "your mentor",
                 )}
               </span>
             </div>
@@ -3017,11 +3105,11 @@ function ChatWidgetInner() {
               />
               {(requestQueryErrors.query_title ||
                 localValidationErrors.query_title) && (
-                <span className="cw-query-error">
-                  {localValidationErrors.query_title ||
-                    requestQueryErrors.query_title}
-                </span>
-              )}
+                  <span className="cw-query-error">
+                    {localValidationErrors.query_title ||
+                      requestQueryErrors.query_title}
+                  </span>
+                )}
             </div>
             <div className="cw-query-field">
               <label className="cw-query-label">
@@ -3056,11 +3144,11 @@ function ChatWidgetInner() {
               />
               {(requestQueryErrors.query_description ||
                 localValidationErrors.query_description) && (
-                <span className="cw-query-error">
-                  {localValidationErrors.query_description ||
-                    requestQueryErrors.query_description}
-                </span>
-              )}
+                  <span className="cw-query-error">
+                    {localValidationErrors.query_description ||
+                      requestQueryErrors.query_description}
+                  </span>
+                )}
             </div>
             {localValidationErrors.category && (
               <span className="cw-query-error">
@@ -3289,43 +3377,19 @@ function ChatWidgetInner() {
                 </div>
               </div>
               <div className="cw-messages" aria-live="polite">
-                {showConversationHistory &&
-                  messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
-                    >
-                      <div
-                        className={`cw-avatar ${m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"}`}
-                      >
-                        {m.sender === "bot" ? (
-                          <Bot size={13} />
-                        ) : (
-                          <User size={12} />
-                        )}
-                      </div>
-                      <div
-                        className={`cw-bubble ${m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"} ${m.answerBlocks && m.answerBlocks.length > 0 ? "cw-bubble--article" : ""}`}
-                      >
-                        {m.sender === "bot" ? (
-                          <MessageRenderer
-                            message={m}
-                            onImageClick={setPreviewImage}
-                          />
-                        ) : (
-                          m.text
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                {flowStep === "live-chat" &&
+                {flowStep === "live-chat" ? (
                   chatbotMessages.map((cm, i) => (
                     <div
-                      key={`chat-${i}`}
-                      className={`cw-msg ${cm.role === "user" ? "cw-msg--user" : ""}`}
+                      key={cm.id || `chat-${i}`}
+                      className={`cw-msg ${cm.role === "user" ? "cw-msg--user" : ""
+                        }`}
                     >
+                      {/* Avatar */}
                       <div
-                        className={`cw-avatar ${cm.role === "assistant" ? "cw-avatar--bot" : "cw-avatar--user"}`}
+                        className={`cw-avatar ${cm.role === "assistant"
+                          ? "cw-avatar--bot"
+                          : "cw-avatar--user"
+                          }`}
                       >
                         {cm.role === "assistant" ? (
                           <Bot size={13} />
@@ -3333,10 +3397,28 @@ function ChatWidgetInner() {
                           <User size={12} />
                         )}
                       </div>
+
+                      {/* Message Bubble */}
                       <div
-                        className={`cw-bubble ${cm.role === "assistant" ? "cw-bubble--bot" : "cw-bubble--user"}`}
+                        className={`cw-bubble ${cm.role === "assistant"
+                          ? "cw-bubble--bot"
+                          : "cw-bubble--user"
+                          } ${cm.answerBlocks && cm.answerBlocks.length > 0
+                            ? "cw-bubble--article"
+                            : ""
+                          }`}
                       >
-                        {cm.role === "assistant" ? (
+                        {cm.role === "assistant" && cm.answerBlocks && cm.answerBlocks.length > 0 ? (
+                          <MessageRenderer
+                            message={{
+                              id: cm.id || `chat-${i}`,
+                              sender: "bot",
+                              text: cm.content,
+                              answerBlocks: cm.answerBlocks,
+                            }}
+                            onImageClick={setPreviewImage}
+                          />
+                        ) : cm.role === "assistant" ? (
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             rehypePlugins={[rehypeHighlight]}
@@ -3348,14 +3430,69 @@ function ChatWidgetInner() {
                         )}
                       </div>
                     </div>
-                  ))}
+                  ))
+                ) : (
+                  showConversationHistory &&
+                  messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""
+                        }`}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className={`cw-avatar ${m.sender === "bot"
+                          ? "cw-avatar--bot"
+                          : "cw-avatar--user"
+                          }`}
+                      >
+                        {m.sender === "bot" ? (
+                          <Bot size={13} />
+                        ) : (
+                          <User size={12} />
+                        )}
+                      </div>
+
+                      {/* Message Bubble */}
+                      <div
+                        className={`cw-bubble ${m.sender === "bot"
+                          ? "cw-bubble--bot"
+                          : "cw-bubble--user"
+                          } ${m.answerBlocks && m.answerBlocks.length > 0
+                            ? "cw-bubble--article"
+                            : ""
+                          }`}
+                      >
+                        {m.sender === "bot" && m.answerBlocks && m.answerBlocks.length > 0 ? (
+                          <MessageRenderer
+                            message={m}
+                            onImageClick={setPreviewImage}
+                          />
+                        ) : m.sender === "bot" ? (
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                          >
+                            {m.text}
+                          </ReactMarkdown>
+                        ) : (
+                          m.text
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {/* Mentor Chat */}
                 {flowStep === "mentor-chat" && (
                   <>
                     {conversationEnded && (
                       <div className="cw-conversation-ended">
-                        <Check size={14} /> {ts("conversationEnded")}
+                        <Check size={14} />
+                        {ts("conversationEnded")}
                       </div>
                     )}
+
                     {mentorMessages
                       .filter(
                         (mm, idx, self) =>
@@ -3368,17 +3505,21 @@ function ChatWidgetInner() {
                       )
                       .map((mm, i) => {
                         const iv = mm.sender === "VISITOR";
-                        const lastIdx =
-                          mentorMessages.filter(
-                            (mm2, idx2, self2) =>
-                              idx2 ===
-                              self2.findIndex(
-                                (m) =>
-                                  m.message_generated_id ===
-                                  mm2.message_generated_id,
-                              ),
-                          ).length - 1;
+
+                        const uniqueMentorMessages = mentorMessages.filter(
+                          (mm2, idx2, self2) =>
+                            idx2 ===
+                            self2.findIndex(
+                              (m) =>
+                                m.message_generated_id ===
+                                mm2.message_generated_id,
+                            ),
+                        );
+
+                        const lastIdx = uniqueMentorMessages.length - 1;
+
                         const isLastVisitorMsg = iv && i === lastIdx;
+
                         return (
                           <div
                             key={
@@ -3386,17 +3527,32 @@ function ChatWidgetInner() {
                                 ? `${mm.message_generated_id}-${i}`
                                 : `m-${i}`
                             }
-                            className={`cw-msg ${iv ? "cw-msg--user" : ""}`}
+                            className={`cw-msg ${iv ? "cw-msg--user" : ""
+                              }`}
                           >
+                            {/* Mentor / Visitor Avatar */}
                             <div
-                              className={`cw-avatar ${iv ? "cw-avatar--user" : "cw-avatar--bot"}`}
+                              className={`cw-avatar ${iv
+                                ? "cw-avatar--user"
+                                : "cw-avatar--bot"
+                                }`}
                             >
-                              {iv ? <User size={12} /> : <Users size={13} />}
+                              {iv ? (
+                                <User size={12} />
+                              ) : (
+                                <Users size={13} />
+                              )}
                             </div>
+
+                            {/* Mentor Message */}
                             <div
-                              className={`cw-bubble ${iv ? "cw-bubble--user" : "cw-bubble--bot"}`}
+                              className={`cw-bubble ${iv
+                                ? "cw-bubble--user"
+                                : "cw-bubble--bot"
+                                }`}
                             >
                               {mm.message}
+
                               {iv && isLastVisitorMsg && (
                                 <div className="cw-message-status">
                                   {mm.is_read ? (
@@ -3416,9 +3572,14 @@ function ChatWidgetInner() {
                           </div>
                         );
                       })}
+
+                    {/* Conversation Ended - Satisfaction */}
                     {conversationEnded && satisfactionStage === "ask" && (
                       <div className="cw-post-chat-actions">
-                        <p className="cw-post-chat-text">{ts("wasHelpful")}</p>
+                        <p className="cw-post-chat-text">
+                          {ts("wasHelpful")}
+                        </p>
+
                         <div className="cw-post-chat-buttons">
                           <button
                             className="cw-btn cw-btn--query"
@@ -3428,6 +3589,7 @@ function ChatWidgetInner() {
                             <FileText size={14} />
                             {ts("raiseQueryEnd")}
                           </button>
+
                           <button
                             className="cw-btn cw-btn--satisfied"
                             onClick={handleConversationSatisfied}
@@ -3439,49 +3601,64 @@ function ChatWidgetInner() {
                         </div>
                       </div>
                     )}
-                    {conversationEnded && satisfactionStage === "closed" && (
-                      <div className="cw-post-chat-actions cw-post-chat-actions--closed">
-                        <div className="cw-post-chat-icon">
-                          <PartyPopper size={20} />
+
+                    {/* Conversation Closed */}
+                    {conversationEnded &&
+                      satisfactionStage === "closed" && (
+                        <div className="cw-post-chat-actions cw-post-chat-actions--closed">
+                          <div className="cw-post-chat-icon">
+                            <PartyPopper size={20} />
+                          </div>
+
+                          <p className="cw-post-chat-text">
+                            {ts("thanksForChatting")}
+                          </p>
+
+                          <div className="cw-post-chat-buttons">
+                            <button
+                              className="cw-btn cw-btn--home"
+                              onClick={handleBackToHome}
+                              type="button"
+                            >
+                              <Home size={14} />
+                              {ts("backToHome")}
+                            </button>
+
+                            <button
+                              className="cw-btn cw-btn--exit"
+                              onClick={handleExitChat}
+                              type="button"
+                            >
+                              <DoorOpen size={14} />
+                              {ts("exitChat")}
+                            </button>
+                          </div>
                         </div>
-                        <p className="cw-post-chat-text">
-                          {ts("thanksForChatting")}
-                        </p>
-                        <div className="cw-post-chat-buttons">
-                          <button
-                            className="cw-btn cw-btn--home"
-                            onClick={handleBackToHome}
-                            type="button"
-                          >
-                            <Home size={14} />
-                            {ts("backToHome")}
-                          </button>
-                          <button
-                            className="cw-btn cw-btn--exit"
-                            onClick={handleExitChat}
-                            type="button"
-                          >
-                            <DoorOpen size={14} />
-                            {ts("exitChat")}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                      )}
                   </>
                 )}
+
+                {/* Other Dynamic Content */}
                 {renderContent()}
-                {showConversationHistory && (isTyping || chatbotLoading) && (
-                  <div className="cw-msg">
-                    <div className="cw-avatar cw-avatar--bot">
-                      <Bot size={13} />
+
+                {/* Typing / Loading Indicator */}
+                {showConversationHistory &&
+                  (isTyping ||
+                    chatbotLoading ||
+                    faqSearchLoading) && (
+                    <div className="cw-msg">
+                      <div className="cw-avatar cw-avatar--bot">
+                        <Bot size={13} />
+                      </div>
+
+                      <div className="cw-typing">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
                     </div>
-                    <div className="cw-typing">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                  </div>
-                )}
+                  )}
+
                 <div ref={messagesEndRef} />
               </div>
               {showFooterInput && flowStep === "mentor-form" && (
@@ -3547,10 +3724,10 @@ function ChatWidgetInner() {
                 <div className="cw-input-area">
                   {(chatbotErrors.question ||
                     localValidationErrors.message) && (
-                    <div className="cw-form-error">
-                      {localValidationErrors.message || chatbotErrors.question}
-                    </div>
-                  )}
+                      <div className="cw-form-error">
+                        {localValidationErrors.message || chatbotErrors.question}
+                      </div>
+                    )}
                   <form className="cw-input-row" onSubmit={handleLiveChatSend}>
                     <input
                       className={`cw-input ${chatbotErrors.question || localValidationErrors.message ? "has-error" : ""}`}
@@ -3584,10 +3761,10 @@ function ChatWidgetInner() {
                   <div className="cw-input-area">
                     {(mentorErrors.message ||
                       localValidationErrors.message) && (
-                      <div className="cw-form-error">
-                        {localValidationErrors.message || mentorErrors.message}
-                      </div>
-                    )}
+                        <div className="cw-form-error">
+                          {localValidationErrors.message || mentorErrors.message}
+                        </div>
+                      )}
                     <form
                       className="cw-input-row"
                       onSubmit={handleMentorChatSend}
@@ -3646,3 +3823,4 @@ export default function ChatWidget() {
     </FAQProvider>
   );
 }
+

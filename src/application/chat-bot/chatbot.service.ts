@@ -4,7 +4,7 @@ import { AskQuestionPayload } from "./chatbot.types";
 
 class ChatbotService {
   // =====================================================
-  // ASK QUESTION WITH LANGUAGE SUPPORT
+  // ASK QUESTION
   // =====================================================
 
   async askQuestion(payload: AskQuestionPayload) {

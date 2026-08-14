@@ -1,13 +1,14 @@
 "use client";
 
-// =====================================================
-// React
 // ======================================================
+// React
+// =====================================================
 
 import {
   ChangeEvent,
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useState,
 } from "react";
@@ -52,13 +53,17 @@ interface ChatbotContextType {
 
   selectedLanguage: string;
 
-  handleChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  changeLanguage: (languageCode: string) => void;
 
-  changeLanguage: (language: string) => void;
+  handleChange: (e: ChangeEvent<HTMLInputElement>) => void;
 
   resetForm: () => void;
 
-  askQuestion: () => Promise<boolean>;
+  clearQuestionInput: () => void;
+
+  askQuestion: (customQuestion?: string) => Promise<boolean>;
+
+  addMessage: (message: ChatMessage) => void;
 }
 
 // ======================================================
@@ -76,66 +81,108 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  const [question, setQuestion] =
-    useState<AskQuestionPayload>(EMPTY_CHAT_PAYLOAD);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
+
+  const [question, setQuestion] = useState<AskQuestionPayload>({
+    ...EMPTY_CHAT_PAYLOAD,
+    language: "en",
+  });
 
   const [response, setResponse] = useState<ChatResponse | null>(null);
 
   const [errors, setErrors] = useState<ChatValidationErrors>({});
 
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
+  // ======================================================
+  // CHANGE LANGUAGE
+  // ======================================================
+
+  const changeLanguage = useCallback((languageCode: string) => {
+    setSelectedLanguage(languageCode);
+
+    setQuestion((prev) => ({
+      ...prev,
+      language: languageCode,
+    }));
+  }, []);
 
   // ======================================================
   // HANDLE CHANGE
   // ======================================================
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
 
-    setQuestion((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    if (errors[name as keyof ChatValidationErrors]) {
-      setErrors((prev) => ({
+      setQuestion((prev) => ({
         ...prev,
-        [name]: "",
+        [name]: value,
+        language: selectedLanguage || "en",
       }));
-    }
-  };
+
+      if (errors[name as keyof ChatValidationErrors]) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "",
+        }));
+      }
+    },
+    [errors, selectedLanguage],
+  );
 
   // ======================================================
-  // CHANGE LANGUAGE
+  // ADD MESSAGE
   // ======================================================
 
-  const changeLanguage = (language: string) => {
-    setSelectedLanguage(language);
-    setQuestion((prev) => ({
-      ...prev,
-      language,
-    }));
+  const addMessage = (message: ChatMessage) => {
+    setMessages((prev) => [...prev, message]);
   };
-
   // ======================================================
   // RESET
   // ======================================================
 
-  const resetForm = () => {
-    setQuestion(EMPTY_CHAT_PAYLOAD);
+  const resetForm = useCallback(() => {
+    setQuestion({
+      ...EMPTY_CHAT_PAYLOAD,
+      language: selectedLanguage || "en",
+    });
 
     setErrors({});
-  };
+
+    setMessages([]);
+
+    setResponse(null);
+  }, [selectedLanguage]);
 
   // ======================================================
   // ASK QUESTION
   // ======================================================
-
-  const askQuestion = async (): Promise<boolean> => {
+  const askQuestion = async (
+    customQuestion?: string,
+  ): Promise<boolean> => {
     try {
       setLoading(true);
 
-      const validationErrors = validateQuestion(question);
+      // ==================================================
+      // QUESTION
+      // ==================================================
+
+      const questionText = customQuestion ?? question.question;
+
+      // ==================================================
+      // PAYLOAD
+      // ==================================================
+
+      const payloadToSend: AskQuestionPayload = {
+        question: questionText.trim(),
+
+        language: question.language || selectedLanguage || "en",
+      };
+
+      // ==================================================
+      // VALIDATION
+      // ==================================================
+
+      const validationErrors = validateQuestion(payloadToSend);
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
@@ -145,27 +192,63 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
       setErrors({});
 
+      // ==================================================
+      // ADD USER MESSAGE
+      // ==================================================
+
       setMessages((prev) => [
         ...prev,
         {
           role: "user",
-          content: question.question,
+          content: questionText.trim(),
         },
       ]);
 
-      // Pass the selected language along with the question
-      const payloadWithLanguage = {
-        ...question,
-        language: selectedLanguage,
-      };
+      // ==================================================
+      // CALL CHAT API
+      //
+      // IMPORTANT:
+      // Do NOT call FAQService.searchFAQs() here.
+      //
+      // /chat already performs:
+      //
+      // Question
+      //   ↓
+      // FAQ Search
+      //   ↓
+      // FAQ answer if found
+      //   ↓
+      // Vector/RAG fallback
+      // ==================================================
 
-      const result = await ChatbotService.askQuestion(payloadWithLanguage);
+      const result = await ChatbotService.askQuestion(payloadToSend);
 
-      if (!result.success) {
+      // ==================================================
+      // API FAILURE
+      // ==================================================
+
+      if (!result?.success) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "Sorry, I couldn't process your question right now.",
+          },
+        ]);
+
         return false;
       }
 
+      // ==================================================
+      // SAVE RESPONSE
+      // ==================================================
+
       setResponse(result.data);
+
+      // ==================================================
+      // ADD ASSISTANT MESSAGE
+      // ==================================================
 
       setMessages((prev) => [
         ...prev,
@@ -175,17 +258,44 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
         },
       ]);
 
-      setQuestion(EMPTY_CHAT_PAYLOAD);
+      // ==================================================
+      // RESET INPUT ONLY
+      // ==================================================
+
+      setQuestion({
+        ...EMPTY_CHAT_PAYLOAD,
+
+        language: selectedLanguage || "en",
+      });
 
       return true;
     } catch (error) {
-      console.error(error);
+      console.error("Failed to ask chatbot question:", error);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Sorry, something went wrong while processing your question.",
+        },
+      ]);
 
       return false;
     } finally {
       setLoading(false);
     }
   };
+
+  // another reset option here 
+  const clearQuestionInput = useCallback(() => {
+    setQuestion({
+      ...EMPTY_CHAT_PAYLOAD,
+      language: selectedLanguage || "en",
+    });
+
+    setErrors({});
+  }, [selectedLanguage]);
 
   // ======================================================
   // CONTEXT VALUE
@@ -204,13 +314,17 @@ export const ChatbotProvider = ({ children }: { children: ReactNode }) => {
 
     selectedLanguage,
 
-    handleChange,
-
     changeLanguage,
+
+    handleChange,
 
     resetForm,
 
+    clearQuestionInput,
+
     askQuestion,
+
+    addMessage,
   };
 
   return (

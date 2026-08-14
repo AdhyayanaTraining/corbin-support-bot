@@ -27,6 +27,7 @@ import FAQService from "./faq.service";
 
 import {
   FAQ,
+  FAQQuestion,
   CreateFAQPayload,
   UpdateFAQPayload,
   CreateFAQQuestionPayload,
@@ -41,17 +42,26 @@ import {
 
 import {
   validateFAQ,
+  validateFAQQuestion,
   validateFAQAnswer,
   FAQValidationErrors,
+  FAQQuestionValidationErrors,
   FAQAnswerValidationErrors,
 } from "./faq.validation";
 
 // ======================================================
 // EMPTY FAQ
+//
+// IMPORTANT:
+//
+// Root FAQ contains ONLY the main/default question.
+//
+// SEO metadata belongs to individual questions.
 // ======================================================
 
 const EMPTY_FAQ: CreateFAQPayload = {
   faq_default_question: "",
+
   faq_created_by: "admin",
 };
 
@@ -72,11 +82,19 @@ interface FAQContextType {
 
   faqErrors: FAQValidationErrors;
 
+  faqQuestionErrors: FAQQuestionValidationErrors;
+
   selectedFAQ: FAQ | null;
 
   language: string;
 
   setLanguage: React.Dispatch<React.SetStateAction<string>>;
+
+  searchFAQs: (
+    searchTerm: string,
+    searchLanguage?: string,
+  ) => Promise<FAQQuestion | null>;
+  faqSearchLoading: boolean;
 
   // ====================================================
   // FAQ
@@ -148,6 +166,14 @@ interface FAQContextType {
   ) => Promise<boolean>;
 
   // ====================================================
+  // QUESTION VALIDATION
+  // ====================================================
+
+  validateQuestion: (
+    payload: CreateFAQQuestionPayload,
+  ) => FAQQuestionValidationErrors;
+
+  // ====================================================
   // FAQ ANSWER
   // ====================================================
 
@@ -205,9 +231,94 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
 
   const [faqErrors, setFaqErrors] = useState<FAQValidationErrors>({});
 
+  const [faqQuestionErrors, setFaqQuestionErrors] =
+    useState<FAQQuestionValidationErrors>({});
+
   const [selectedFAQ, setSelectedFAQ] = useState<FAQ | null>(null);
 
   const [language, setLanguage] = useState("en");
+
+  const [faqSearchLoading, setFaqSearchLoading] = useState(false);
+
+  // ====================================================
+  // SEARCH FAQS
+  // ====================================================
+
+  const searchFAQs = async (
+    searchTerm: string,
+    searchLanguage?: string,
+  ): Promise<FAQQuestion | null> => {
+    try {
+      setFaqSearchLoading(true);
+
+      const response = await FAQService.searchFAQs(
+        searchTerm,
+        searchLanguage || "en",
+      );
+
+      if (!response.success || !response.data) {
+        return null;
+      }
+
+      const data = response.data;
+
+      // API returned an array
+      if (Array.isArray(data)) {
+        const item = data[0];
+
+        if (!item) {
+          return null;
+        }
+
+        // Direct FAQQuestion
+        if (item.question_text || item.answers) {
+          return item as FAQQuestion;
+        }
+
+        // Root FAQ -> category -> question
+        if (item.categories?.length) {
+          const firstCategory = item.categories[0];
+
+          if (firstCategory?.questions?.length) {
+            return firstCategory.questions[0] as FAQQuestion;
+          }
+        }
+
+        return null;
+      }
+
+      // API returned an object
+      if (typeof data === "object") {
+        const item = data as any;
+
+        // { question: {...} }
+        if (item.question) {
+          return item.question as FAQQuestion;
+        }
+
+        // Direct FAQQuestion
+        if (item.question_text || item.answers) {
+          return item as FAQQuestion;
+        }
+
+        // Root FAQ -> category -> question
+        if (item.categories?.length) {
+          const firstCategory = item.categories[0];
+
+          if (firstCategory?.questions?.length) {
+            return firstCategory.questions[0] as FAQQuestion;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error("FAQ search failed:", error);
+      return null;
+    } finally {
+      setFaqSearchLoading(false);
+    }
+  };
 
   // ====================================================
   // GET ALL FAQS WHEN LANGUAGE CHANGES
@@ -260,6 +371,8 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
 
     setFaqErrors({});
 
+    setFaqQuestionErrors({});
+
     setSelectedFAQ(null);
   };
 
@@ -280,6 +393,8 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
     });
 
     setFaqErrors({});
+
+    setFaqQuestionErrors({});
   };
 
   // ====================================================
@@ -317,7 +432,7 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
         language,
       );
 
-      if (response.success) {
+      if (response.success && response.data) {
         setSelectedFAQData(response.data);
       }
     } catch (error) {
@@ -329,10 +444,21 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
 
   // ====================================================
   // CREATE FAQ
+  //
+  // Root FAQ only contains:
+  //
+  // faq_default_question
+  // faq_created_by
+  //
+  // No SEO metadata here.
   // ====================================================
 
   const createFAQ = async (): Promise<boolean> => {
     try {
+      // ==================================================
+      // VALIDATE ROOT FAQ
+      // ==================================================
+
       const validationErrors = validateFAQ(faq);
 
       if (Object.keys(validationErrors).length > 0) {
@@ -341,9 +467,23 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
+      // ==================================================
+      // CLEAR OLD ERRORS
+      // ==================================================
+
+      setFaqErrors({});
+
+      // ==================================================
+      // API REQUEST
+      // ==================================================
+
       setLoading(true);
 
       const response = await FAQService.createFAQ(faq);
+
+      // ==================================================
+      // SUCCESS
+      // ==================================================
 
       if (response.success) {
         await getAllFAQs();
@@ -365,6 +505,8 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
 
   // ====================================================
   // UPDATE FAQ
+  //
+  // Root FAQ only updates the default question.
   // ====================================================
 
   const updateFAQ = async (
@@ -372,9 +514,50 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
     payload: UpdateFAQPayload,
   ): Promise<boolean> => {
     try {
+      // ==================================================
+      // VALIDATE ROOT FAQ UPDATE
+      // ==================================================
+
+      const validationErrors: FAQValidationErrors = {};
+
+      if (payload.faq_default_question !== undefined) {
+        const question = payload.faq_default_question.trim();
+
+        if (!question) {
+          validationErrors.faq_default_question = "FAQ question is required.";
+        } else if (question.length < 10) {
+          validationErrors.faq_default_question =
+            "FAQ question must be at least 10 characters.";
+        }
+      }
+
+      // ==================================================
+      // STOP IF INVALID
+      // ==================================================
+
+      if (Object.keys(validationErrors).length > 0) {
+        setFaqErrors(validationErrors);
+
+        return false;
+      }
+
+      // ==================================================
+      // CLEAR OLD ERRORS
+      // ==================================================
+
+      setFaqErrors({});
+
+      // ==================================================
+      // API REQUEST
+      // ==================================================
+
       setLoading(true);
 
       const response = await FAQService.updateFAQ(faq_generated_id, payload);
+
+      // ==================================================
+      // SUCCESS
+      // ==================================================
 
       if (response.success) {
         await getAllFAQs();
@@ -523,7 +706,28 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ====================================================
+  // VALIDATE QUESTION
+  //
+  // Question validation includes:
+  //
+  // - question_text
+  // - meta_title
+  // - meta_description
+  // - meta_keywords
+  // ====================================================
+
+  const validateQuestion = (
+    payload: CreateFAQQuestionPayload,
+  ): FAQQuestionValidationErrors => {
+    return validateFAQQuestion(payload);
+  };
+
+  // ====================================================
   // ADD QUESTION TO CATEGORY
+  //
+  // IMPORTANT:
+  //
+  // Each question owns its own SEO metadata.
   // ====================================================
 
   const addCategoryQuestion = async (
@@ -532,6 +736,28 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
     payload: CreateFAQQuestionPayload,
   ): Promise<boolean> => {
     try {
+      // ==================================================
+      // VALIDATE QUESTION
+      // ==================================================
+
+      const validationErrors = validateFAQQuestion(payload);
+
+      if (Object.keys(validationErrors).length > 0) {
+        setFaqQuestionErrors(validationErrors);
+
+        return false;
+      }
+
+      // ==================================================
+      // CLEAR OLD QUESTION ERRORS
+      // ==================================================
+
+      setFaqQuestionErrors({});
+
+      // ==================================================
+      // API REQUEST
+      // ==================================================
+
       setLoading(true);
 
       const response = await FAQService.addCategoryQuestion(
@@ -539,6 +765,10 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
         category_generated_id,
         payload,
       );
+
+      // ==================================================
+      // SUCCESS
+      // ==================================================
 
       if (response.success) {
         await getFAQByGeneratedId(faq_generated_id);
@@ -558,6 +788,14 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
 
   // ====================================================
   // UPDATE CATEGORY QUESTION
+  //
+  // IMPORTANT:
+  //
+  // This is a PARTIAL update.
+  //
+  // Only values supplied in payload are validated.
+  //
+  // Metadata belongs to this question.
   // ====================================================
 
   const updateCategoryQuestion = async (
@@ -567,6 +805,86 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
     payload: UpdateFAQQuestionPayload,
   ): Promise<boolean> => {
     try {
+      // ==================================================
+      // VALIDATE PARTIAL QUESTION UPDATE
+      // ==================================================
+
+      const validationErrors: FAQQuestionValidationErrors = {};
+
+      // ==================================================
+      // QUESTION TEXT
+      // ==================================================
+
+      if (payload.question_text !== undefined) {
+        const questionText = payload.question_text.trim();
+
+        if (!questionText) {
+          validationErrors.question_text = "Question is required.";
+        } else if (questionText.length < 3) {
+          validationErrors.question_text =
+            "Question must be at least 3 characters.";
+        }
+      }
+
+      // ==================================================
+      // META TITLE
+      // ==================================================
+
+      if (payload.meta_title !== undefined) {
+        const metaTitle = payload.meta_title.trim();
+
+        if (metaTitle.length > 150) {
+          validationErrors.meta_title =
+            "Meta title must not exceed 150 characters.";
+        }
+      }
+
+      // ==================================================
+      // META DESCRIPTION
+      // ==================================================
+
+      if (payload.meta_description !== undefined) {
+        const metaDescription = payload.meta_description.trim();
+
+        if (metaDescription.length > 300) {
+          validationErrors.meta_description =
+            "Meta description must not exceed 300 characters.";
+        }
+      }
+
+      // ==================================================
+      // META KEYWORDS
+      // ==================================================
+
+      if (payload.meta_keywords !== undefined) {
+        const metaKeywords = payload.meta_keywords.trim();
+
+        if (metaKeywords.length > 500) {
+          validationErrors.meta_keywords =
+            "Meta keywords must not exceed 500 characters.";
+        }
+      }
+
+      // ==================================================
+      // STOP IF INVALID
+      // ==================================================
+
+      if (Object.keys(validationErrors).length > 0) {
+        setFaqQuestionErrors(validationErrors);
+
+        return false;
+      }
+
+      // ==================================================
+      // CLEAR OLD QUESTION ERRORS
+      // ==================================================
+
+      setFaqQuestionErrors({});
+
+      // ==================================================
+      // API REQUEST
+      // ==================================================
+
       setLoading(true);
 
       const response = await FAQService.updateCategoryQuestion(
@@ -575,6 +893,10 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
         question_generated_id,
         payload,
       );
+
+      // ==================================================
+      // SUCCESS
+      // ==================================================
 
       if (response.success) {
         await getFAQByGeneratedId(faq_generated_id);
@@ -708,7 +1030,7 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
       // VALIDATE ANSWER IF DESCRIPTION IS PROVIDED
       // ==================================================
 
-      if (payload.answer_description) {
+      if (payload.answer_description !== undefined) {
         const validationErrors = validateFAQAnswer({
           answer_description: payload.answer_description,
         });
@@ -800,26 +1122,43 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
     // ==================================================
 
     loading,
+
     faqs,
+
     faq,
+
     faqErrors,
+
+    faqQuestionErrors,
+
     selectedFAQ,
+
     language,
+
     setLanguage,
+
+    searchFAQs,
+
+    faqSearchLoading,
 
     // ==================================================
     // FAQ
     // ==================================================
 
     setSelectedFAQData,
+
     handleFAQChange,
+
     resetFAQForm,
 
     getAllFAQs,
+
     getFAQByGeneratedId,
 
     createFAQ,
+
     updateFAQ,
+
     deleteFAQ,
 
     // ==================================================
@@ -827,7 +1166,9 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
     // ==================================================
 
     addFAQCategory,
+
     updateFAQCategory,
+
     deleteFAQCategory,
 
     // ==================================================
@@ -835,15 +1176,21 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
     // ==================================================
 
     addCategoryQuestion,
+
     updateCategoryQuestion,
+
     deleteCategoryQuestion,
+
+    validateQuestion,
 
     // ==================================================
     // ANSWER
     // ==================================================
 
     addCategoryAnswer,
+
     updateCategoryAnswer,
+
     deleteCategoryAnswer,
 
     // ==================================================
