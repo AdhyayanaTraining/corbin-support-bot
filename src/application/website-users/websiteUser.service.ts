@@ -1,15 +1,19 @@
 import axiosClient from "@/src/infrastructure/api/axiosClient";
-
-import { CreateWebsiteUserPayload } from "./websiteUser.types";
+import {
+  CreateWebsiteUserPayload,
+  WebsiteUserApiResponse,
+  WebsiteUsersApiResponse,
+} from "./websiteUser.types";
 
 class WebsiteUserService {
   // =====================================================
   // ADD WEBSITE USER
   // =====================================================
 
-  async addWebsiteUser(payload: CreateWebsiteUserPayload) {
+  async addWebsiteUser(
+    payload: CreateWebsiteUserPayload,
+  ): Promise<WebsiteUserApiResponse> {
     const response = await axiosClient.post("/add-website-user", payload);
-
     return response.data;
   }
 
@@ -17,9 +21,8 @@ class WebsiteUserService {
   // GET ALL WEBSITE USERS
   // =====================================================
 
-  async getWebsiteUsers() {
+  async getWebsiteUsers(): Promise<WebsiteUsersApiResponse> {
     const response = await axiosClient.get("/get-website-users");
-
     return response.data;
   }
 
@@ -27,11 +30,23 @@ class WebsiteUserService {
   // GET WEBSITE USER BY GENERATED ID
   // =====================================================
 
-  async getWebsiteUserByGeneratedId(registerd_employee_generated_id: string) {
+  async getWebsiteUserByGeneratedId(
+    registerd_employee_generated_id: string,
+  ): Promise<WebsiteUserApiResponse> {
     const response = await axiosClient.get(
       `/get-website-user-by-id/${registerd_employee_generated_id}`,
     );
+    return response.data;
+  }
 
+  // =====================================================
+  // GET WEBSITE USER BY EMAIL
+  // =====================================================
+
+  async getWebsiteUserByEmail(email: string): Promise<WebsiteUserApiResponse> {
+    const response = await axiosClient.get(
+      `/get-website-user-by-email?email=${encodeURIComponent(email)}`,
+    );
     return response.data;
   }
 
@@ -39,11 +54,12 @@ class WebsiteUserService {
   // DELETE WEBSITE USER
   // =====================================================
 
-  async deleteWebsiteUser(registerd_employee_generated_id: string) {
+  async deleteWebsiteUser(
+    registerd_employee_generated_id: string,
+  ): Promise<WebsiteUserApiResponse> {
     const response = await axiosClient.delete(
       `/delete-website-user/${registerd_employee_generated_id}`,
     );
-
     return response.data;
   }
 }
