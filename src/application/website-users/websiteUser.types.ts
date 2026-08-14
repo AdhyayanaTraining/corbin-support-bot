@@ -4,17 +4,11 @@
 
 export interface WebsiteUser {
   registerd_employee_generated_id?: string;
-
   name: string;
-
   email: string;
-
   phone_number: string;
-
   registered_at?: Date;
-
   created_at?: Date;
-
   updated_at?: Date;
 }
 
@@ -24,10 +18,25 @@ export interface WebsiteUser {
 
 export interface CreateWebsiteUserPayload {
   name: string;
-
   email: string;
-
   phone_number: string;
+}
+
+// ======================================================
+// API RESPONSE
+// ======================================================
+
+export interface WebsiteUserApiResponse {
+  success: boolean;
+  message?: string;
+  data?: WebsiteUser;
+  isExistingUser?: boolean;
+}
+
+export interface WebsiteUsersApiResponse {
+  success: boolean;
+  message?: string;
+  data?: WebsiteUser[];
 }
 
 // ======================================================
@@ -36,8 +45,6 @@ export interface CreateWebsiteUserPayload {
 
 export const EMPTY_WEBSITE_USER: CreateWebsiteUserPayload = {
   name: "",
-
   email: "",
-
   phone_number: "",
 };

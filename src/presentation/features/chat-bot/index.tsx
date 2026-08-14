@@ -1440,6 +1440,11 @@ function ChatWidgetInner() {
     addWebsiteUser,
     resetForm: resetWebsiteUserForm,
     registeredEmployeeId,
+    isDuplicateUser,
+    duplicateUser,
+    successMessage: websiteUserSuccessMessage,
+    errorMessage: websiteUserErrorMessage,
+    clearMessages: clearWebsiteUserMessages,
   } = useWebsiteUser();
   const {
     requestQuery,
@@ -1706,31 +1711,82 @@ function ChatWidgetInner() {
     },
     [pushMessage],
   );
-
   // ====== Contact form submission ======
   useEffect(() => {
     if (submitTrigger === 0 || hasSavedContact.current) return;
-    let c = false;
+    let cancelled = false;
     hasSavedContact.current = true;
     setIsSavingContact(true);
+
     (async () => {
       try {
-        const ok = await addWebsiteUser();
-        if (c) return;
+        // Get the result directly from addWebsiteUser
+        const result = await addWebsiteUser();
+
+        if (cancelled) return;
         setIsSavingContact(false);
-        if (ok) {
-          setWaitingForEmployeeId(true);
-          setIsTyping(false);
+
+        if (result?.success) {
+          const contact = pendingContactRef.current;
+
+          if (contact && result.registeredEmployeeId) {
+            // We have a registeredEmployeeId (either new or existing)
+            const updated: ContactDetails = {
+              ...contact,
+              registered_employee_generated_id: result.registeredEmployeeId,
+            };
+
+            setSavedContact(updated);
+
+            // Save to localStorage
+            try {
+              window.localStorage.setItem(
+                CONTACT_STORAGE_KEY,
+                JSON.stringify(updated),
+              );
+            } catch (err) { }
+
+            // Get existing conversations for this user
+            getVisitorConversations(result.registeredEmployeeId);
+
+            // Show appropriate message
+            if (result.isExistingUser) {
+              const welcomeMsg = (t("welcomeBack") as (name: string) => string)(
+                result.data?.name || contact.name,
+              );
+              pushMessage("bot", welcomeMsg);
+            } else {
+              const thanksMsg = (t("thanksSaved") as (name: string) => string)(
+                contact.name,
+              );
+              pushMessage("bot", thanksMsg);
+            }
+
+            // Move to mentor options
+            setFlowStep("mentor-options");
+            setWaitingForEmployeeId(false);
+            hasSavedContact.current = false;
+            setIsTyping(false);
+          } else {
+            // No registeredEmployeeId - something went wrong
+            setIsTyping(false);
+            pushMessage("bot", ts("saveError"));
+            setMentorFormStep("email");
+            setDraft("");
+            setFlowStep("mentor-form");
+            hasSavedContact.current = false;
+          }
         } else {
+          // API call failed
           setIsTyping(false);
-          pushMessage("bot", ts("saveError"));
+          pushMessage("bot", result?.message || ts("saveError"));
           setMentorFormStep("email");
           setDraft("");
           setFlowStep("mentor-form");
           hasSavedContact.current = false;
         }
       } catch (err) {
-        if (c) return;
+        if (cancelled) return;
         setIsSavingContact(false);
         setIsTyping(false);
         pushMessage("bot", ts("saveErrorRetry"));
@@ -1740,31 +1796,12 @@ function ChatWidgetInner() {
         hasSavedContact.current = false;
       }
     })();
+
     return () => {
-      c = true;
+      cancelled = true;
     };
   }, [submitTrigger]);
 
-  useEffect(() => {
-    if (!waitingForEmployeeId || !registeredEmployeeId) return;
-    const contact = pendingContactRef.current;
-    if (!contact) return;
-    const updated: ContactDetails = {
-      ...contact,
-      registered_employee_generated_id: registeredEmployeeId,
-    };
-    setSavedContact(updated);
-    try {
-      window.localStorage.setItem(CONTACT_STORAGE_KEY, JSON.stringify(updated));
-    } catch (err) { }
-    const thanksMsg = (t("thanksSaved") as (name: string) => string)(
-      contact.name,
-    );
-    pushMessage("bot", thanksMsg);
-    setFlowStep("mentor-options");
-    setWaitingForEmployeeId(false);
-    hasSavedContact.current = false;
-  }, [waitingForEmployeeId, registeredEmployeeId]);
 
   useEffect(() => {
     if (querySubmitTrigger === 0) return;
@@ -1938,6 +1975,7 @@ function ChatWidgetInner() {
     setLocalValidationErrors({});
     resetChatbotForm();
     resetWebsiteUserForm();
+    clearWebsiteUserMessages();
     resetRequestQueryForm();
     resetMentorConversation();
     resetMentorMessage();
@@ -1952,6 +1990,7 @@ function ChatWidgetInner() {
     leaveRoom,
     resetChatbotForm,
     resetWebsiteUserForm,
+    clearWebsiteUserMessages,
     resetRequestQueryForm,
     resetMentorConversation,
     resetMentorMessage,
@@ -2141,6 +2180,7 @@ function ChatWidgetInner() {
     pendingContactRef.current = null;
     setLocalValidationErrors({});
     resetWebsiteUserForm();
+    clearWebsiteUserMessages();
     try {
       window.localStorage.removeItem(CONTACT_STORAGE_KEY);
     } catch (err) { }
@@ -2160,7 +2200,7 @@ function ChatWidgetInner() {
       pushMessage("bot", "What's your **full name**?");
       setFlowStep("mentor-form");
     }, 550);
-  }, [pushMessage, resetWebsiteUserForm]);
+  }, [pushMessage, resetWebsiteUserForm, clearWebsiteUserMessages]);
 
   const handleMentorFormSubmit = useCallback(() => {
     const text = draft.trim();

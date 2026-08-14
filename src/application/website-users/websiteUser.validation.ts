@@ -6,9 +6,7 @@ import { CreateWebsiteUserPayload } from "./websiteUser.types";
 
 export interface WebsiteUserValidationErrors {
   name?: string;
-
   email?: string;
-
   phone_number?: string;
 }
 
@@ -27,6 +25,10 @@ export function validateWebsiteUser(
 
   if (!websiteUser.name.trim()) {
     errors.name = "Name is required.";
+  } else if (websiteUser.name.trim().length < 2) {
+    errors.name = "Name must be at least 2 characters long.";
+  } else if (websiteUser.name.trim().length > 50) {
+    errors.name = "Name must be less than 50 characters.";
   }
 
   // ======================================================
@@ -35,7 +37,7 @@ export function validateWebsiteUser(
 
   if (!websiteUser.email.trim()) {
     errors.email = "Email is required.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(websiteUser.email)) {
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(websiteUser.email.trim())) {
     errors.email = "Please enter a valid email address.";
   }
 
@@ -45,7 +47,7 @@ export function validateWebsiteUser(
 
   if (!websiteUser.phone_number.trim()) {
     errors.phone_number = "Phone number is required.";
-  } else if (!/^[0-9]{10}$/.test(websiteUser.phone_number)) {
+  } else if (!/^[0-9]{10}$/.test(websiteUser.phone_number.trim())) {
     errors.phone_number = "Phone number must be exactly 10 digits.";
   }
 
