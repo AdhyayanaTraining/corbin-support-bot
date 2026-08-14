@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 // ======================================================
@@ -208,30 +209,39 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
   // ======================================================
   // ADD REQUEST QUERY
   // ======================================================
+  // ======================================================
+  // ADD REQUEST QUERY
+  // ======================================================
 
-  const addRequestQuery = async (): Promise<boolean> => {
+  const addRequestQuery = async (): Promise<any> => {
     const validationErrors = validateRequestQuery(requestQuery);
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-
-      return false;
+      return { success: false, errors: validationErrors };
     }
 
     try {
       setLoading(true);
 
-      await RequestQueryService.addRequestQuery(requestQuery);
+      const response = await RequestQueryService.addRequestQuery(requestQuery);
+
+      if (!response.success) {
+        return { success: false, message: response.message };
+      }
 
       await getRequestQueries();
-
       resetForm();
 
-      return true;
+      // Return the full response including request_id
+      return {
+        success: true,
+        data: response.data,
+        request_id: response.data?.request_id,
+      };
     } catch (error) {
       console.error("Error adding request query:", error);
-
-      return false;
+      return { success: false, message: "Failed to add request query." };
     } finally {
       setLoading(false);
     }

@@ -115,6 +115,16 @@ interface ContactDetails {
   registered_employee_generated_id?: string;
 }
 
+// The globally "active" topic/category the user picked at the very start
+// of the conversation (or later changed via the top banner). This is what
+// we persist to localStorage and use as the default category everywhere
+// else in the widget (e.g. Raise a Query no longer asks the user to pick
+// a category from scratch — it defaults to this).
+interface ActiveTopicCategory {
+  id: string | null;
+  name: string;
+}
+
 interface ValidationErrors {
   name?: string;
   mobile?: string;
@@ -1109,6 +1119,13 @@ const sanitizeName = (value: string) => {
   return value.trim().replace(/\s+/g, " ");
 };
 
+// Helper to get ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+const getOrdinalSuffix = (n: number): string => {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+};
+
 const CONTACT_STORAGE_KEY = "nimobot_contact_details";
 const FAQ_TOPIC_STORAGE_KEY = "nimobot_selected_faq_topic";
 const LAUNCHER_SIZE = 84;
@@ -1442,6 +1459,7 @@ function ChatWidgetInner() {
     registeredEmployeeId,
     isDuplicateUser,
     duplicateUser,
+    totalSessions,
     successMessage: websiteUserSuccessMessage,
     errorMessage: websiteUserErrorMessage,
     clearMessages: clearWebsiteUserMessages,
@@ -1495,6 +1513,12 @@ function ChatWidgetInner() {
   const [selectedQuestion, setSelectedQuestion] = useState<FAQQuestion | null>(
     null,
   );
+  // The globally "active" topic/category — selected at the very start of
+  // the chat (or changed later via the top banner). Persists to
+  // localStorage and drives the default category used when raising a
+  // query, so the user is never asked to pick a category twice.
+  const [activeCategory, setActiveCategory] =
+    useState<ActiveTopicCategory | null>(null);
   const [mentorForm, setMentorForm] = useState<ContactDetails>({
     name: "",
     mobile: "",
@@ -1600,6 +1624,44 @@ function ChatWidgetInner() {
       }
     } catch (err) { }
   }, []);
+
+  // ====== Active topic/category storage (read on mount) ======
+  // This is the topic the user picked at the very start of the
+  // conversation (or later changed via the top "Change" banner). It
+  // persists across sessions and is used as the default category
+  // everywhere else — most importantly, Raise a Query no longer asks the
+  // user to pick a category, it just uses this.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(FAQ_TOPIC_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { id?: string | null; name?: string };
+        if (parsed?.name) {
+          setActiveCategory({ id: parsed.id ?? null, name: parsed.name });
+        }
+      }
+    } catch (err) { }
+  }, []);
+
+  // ====== Auto-select the first main FAQ question on open ======
+  // Previously the user had to first pick a "main question" (faq-list)
+  // before seeing categories/topics. Now the very first main question is
+  // auto-selected the moment FAQs are available, so the user's first real
+  // interaction is choosing a topic/category (faq-categories), not
+  // choosing among main questions.
+  useEffect(() => {
+    if (showLanguageSelector) return;
+    if (faqsLoading) return;
+    if (flowStep !== "faq-list") return;
+    if (selectedFAQ) return;
+    const activeFaqs = faqs.filter((f) => f.isActiveFAQ);
+    const firstFaq = activeFaqs[0] || faqs[0];
+    if (!firstFaq) return;
+    setSelectedFAQ(firstFaq);
+    setSelectedCategory(null);
+    setSelectedQuestion(null);
+    setFlowStep("faq-categories");
+  }, [showLanguageSelector, faqsLoading, flowStep, selectedFAQ, faqs]);
 
   // ====== Conversation management ======
   useEffect(() => {
@@ -1712,6 +1774,7 @@ function ChatWidgetInner() {
     [pushMessage],
   );
   // ====== Contact form submission ======
+  // ====== Contact form submission ======
   useEffect(() => {
     if (submitTrigger === 0 || hasSavedContact.current) return;
     let cancelled = false;
@@ -1721,8 +1784,7 @@ function ChatWidgetInner() {
     (async () => {
       try {
         // Get the result directly from addWebsiteUser
-        const result = await addWebsiteUser();
-
+        const result: any = await addWebsiteUser();
         if (cancelled) return;
         setIsSavingContact(false);
 
@@ -1749,13 +1811,21 @@ function ChatWidgetInner() {
             // Get existing conversations for this user
             getVisitorConversations(result.registeredEmployeeId);
 
-            // Show appropriate message
-            if (result.isExistingUser) {
+            // Show appropriate message based on session count
+            if (result.isExistingUser && result.totalSessions) {
+              // Returning user - show session count
               const welcomeMsg = (t("welcomeBack") as (name: string) => string)(
                 result.data?.name || contact.name,
               );
               pushMessage("bot", welcomeMsg);
+
+              // Optionally show session info
+              if (result.totalSessions > 2) {
+                const sessionMsg = `This is your ${result.totalSessions}${getOrdinalSuffix(result.totalSessions)} visit!`;
+                simulateTyping(sessionMsg);
+              }
             } else {
+              // New user
               const thanksMsg = (t("thanksSaved") as (name: string) => string)(
                 contact.name,
               );
@@ -1802,22 +1872,38 @@ function ChatWidgetInner() {
     };
   }, [submitTrigger]);
 
-
   useEffect(() => {
     if (querySubmitTrigger === 0) return;
     let c = false;
     (async () => {
       try {
-        const ok = await addRequestQuery();
+        // Get the result with request_id
+        const result: any = await addRequestQuery();
         if (c) return;
-        if (ok) {
-          pushMessage(
-            "bot",
-            `${ts("queryRegistered")}\n\nTicket: **TKT-${Date.now().toString(36).toUpperCase()}**`,
-          );
+
+        if (result?.success) {
+          // Extract request_id from the result
+          const requestId = result?.request_id || result?.data?.request_id;
+
+          if (requestId) {
+            // Show Request ID to user
+            pushMessage(
+              "bot",
+              `${ts("queryRegistered")}\n\nRequest ID: **${requestId}**`,
+            );
+          } else {
+            // Fallback if no request_id
+            pushMessage(
+              "bot",
+              `${ts("queryRegistered")}\n\nTicket: **TKT-${Date.now().toString(36).toUpperCase()}**`,
+            );
+          }
+
           setSelectedQueryCategory(null);
           setFlowStep("mentor-options");
-        } else pushMessage("bot", ts("querySubmitError"));
+        } else {
+          pushMessage("bot", result?.message || ts("querySubmitError"));
+        }
       } catch (err) {
         if (c) return;
         pushMessage("bot", ts("querySubmitErrorRetry"));
@@ -1984,6 +2070,8 @@ function ChatWidgetInner() {
       translations[selectedLanguage as SupportedLanguage] || translations.en
     ).welcomeMessage;
     setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
+    // Note: activeCategory is intentionally left untouched here — the
+    // globally selected topic/category should survive "start over".
   }, [
     flowStep,
     selectedConversation,
@@ -1996,7 +2084,6 @@ function ChatWidgetInner() {
     resetMentorMessage,
     selectedLanguage,
   ]);
-
   const handleCloseLanguageSelector = useCallback(() => {
     setIsOpen(false);
   }, []);
@@ -2048,19 +2135,16 @@ function ChatWidgetInner() {
       setSelectedCategory(null);
       setSelectedQuestion(null);
     } else if (flowStep === "query-category") {
+      // Reached only via the "Change" link inside the query form now —
+      // going back should simply return to the query form, keeping
+      // whatever title/description the user already typed.
+      setFlowStep("query-form");
+    } else if (flowStep === "query-form") {
       resetRequestQueryForm();
       setSelectedQueryCategory(null);
       setFlowStep("mentor-options");
       pushMessage("user", ts("back"));
       simulateTyping(ts("howToProceed"));
-    } else if (flowStep === "query-form") {
-      setFlowStep(
-        expertCategories.length > 0 ? "query-category" : "mentor-options",
-      );
-      pushMessage("user", ts("back"));
-      simulateTyping(
-        expertCategories.length > 0 ? ts("whichCategory") : ts("howToProceed"),
-      );
     } else if (flowStep === "mentor-resume-choice") {
       setFlowStep("mentor-options");
       pushMessage("user", ts("back"));
@@ -2099,7 +2183,6 @@ function ChatWidgetInner() {
     simulateTyping,
     handleStart,
     resetRequestQueryForm,
-    expertCategories.length,
     ts,
   ]);
 
@@ -2115,19 +2198,40 @@ function ChatWidgetInner() {
       setSelectedCategory(cat);
       setSelectedQuestion(null);
       setFlowStep("faq-questions");
+      const topicName =
+        getLocalizedText(cat.topic_name, selectedLanguage || "en") ?? "";
+      const topicId = cat.category_generated_id ?? null;
+      // Update the globally active topic/category — this is what shows in
+      // the top banner and defaults future "Raise a Query" submissions.
+      setActiveCategory({ id: topicId, name: topicName });
       try {
         window.localStorage.setItem(
           FAQ_TOPIC_STORAGE_KEY,
-          JSON.stringify({
-            id: cat.category_generated_id ?? null,
-            name:
-              getLocalizedText(cat.topic_name, selectedLanguage || "en") ?? "",
-          }),
+          JSON.stringify({ id: topicId, name: topicName }),
         );
       } catch (err) { }
     },
     [selectedLanguage],
   );
+
+  // ====== Change active topic (from the persistent top banner) ======
+  // Lets the user jump back into topic/category selection from literally
+  // anywhere in the widget, without losing whatever else they were doing
+  // (contact details, in-progress query, mentor chat, etc.).
+  const handleChangeActiveTopic = useCallback(() => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    setIsTyping(false);
+    setFormError(null);
+    setLocalValidationErrors({});
+    setSelectedCategory(null);
+    setSelectedQuestion(null);
+    if (!selectedFAQ) {
+      const activeFaqs = faqs.filter((f) => f.isActiveFAQ);
+      const firstFaq = activeFaqs[0] || faqs[0];
+      if (firstFaq) setSelectedFAQ(firstFaq);
+    }
+    setFlowStep("faq-categories");
+  }, [selectedFAQ, faqs]);
 
   // ====== Question Selection Handler ======
   // Selecting a question only reveals its answer inline (see renderContent
@@ -2149,6 +2253,13 @@ function ChatWidgetInner() {
           savedContact.name,
         );
         pushMessage("bot", welcomeBackMsg);
+
+        // Show session count if available
+        if (totalSessions > 1) {
+          const sessionMsg = `You've visited us ${totalSessions} times. Welcome back!`;
+          simulateTyping(sessionMsg);
+        }
+
         setMentorForm(savedContact);
         setFlowStep("mentor-options");
       }, 550);
@@ -2170,8 +2281,7 @@ function ChatWidgetInner() {
       setDraft("");
       setFlowStep("mentor-form");
     }, 550);
-  }, [pushMessage, savedContact, ts, t]);
-
+  }, [pushMessage, savedContact, totalSessions, ts, t]);
   const handleEditContact = useCallback(() => {
     setSavedContact(null);
     setWaitingForEmployeeId(false);
@@ -2345,6 +2455,13 @@ function ChatWidgetInner() {
     }
   }, [pushMessage, simulateTyping, getExpertCategories, ts]);
 
+  // ====== Raise a Query ======
+  // No longer asks the user to pick a category up front — it defaults to
+  // the globally active topic (picked at the very start / via the top
+  // banner) and jumps straight to the title/details form. The user can
+  // still change the category for this specific query via the "Change"
+  // link inside the form (handleOpenQueryCategoryChange below), which
+  // lazily loads the mentor/expert category list only when needed.
   const handleStartQueryForm = useCallback(() => {
     const c = savedContact ?? mentorForm;
     handleRequestQueryChange({
@@ -2362,34 +2479,37 @@ function ChatWidgetInner() {
     handleRequestQueryChange({
       target: { name: "query_description", value: "" },
     } as ChangeEvent<HTMLTextAreaElement>);
+    const defaultCategoryName = activeCategory?.name?.trim() || "General";
     handleRequestQueryChange({
-      target: { name: "category", value: "" },
+      target: { name: "category", value: defaultCategoryName },
     } as ChangeEvent<HTMLInputElement>);
     setSelectedQueryCategory(null);
     setLocalValidationErrors({});
     pushMessage("user", ts("raiseQuery"));
-    (async () => {
-      try {
-        const cats = await getExpertCategories();
-        cats.length > 0
-          ? (simulateTyping(ts("whichCategoryQuery")),
-            setFlowStep("query-category"))
-          : (simulateTyping(ts("giveMeTitleDetails")),
-            setFlowStep("query-form"));
-      } catch (err) {
-        simulateTyping(ts("giveMeTitleDetails"));
-        setFlowStep("query-form");
-      }
-    })();
+    simulateTyping(
+      activeCategory?.name ? ts("gotItTitleDetails") : ts("giveMeTitleDetails"),
+    );
+    setFlowStep("query-form");
   }, [
     savedContact,
     mentorForm,
+    activeCategory,
     pushMessage,
     simulateTyping,
     handleRequestQueryChange,
-    getExpertCategories,
     ts,
   ]);
+
+  // ====== Open category picker to change the query's category ======
+  // Only reachable via the "Change" link inside the query form now. Lazily
+  // fetches expert categories on demand instead of upfront.
+  const handleOpenQueryCategoryChange = useCallback(async () => {
+    setLocalValidationErrors({});
+    try {
+      await getExpertCategories();
+    } catch (err) { }
+    setFlowStep("query-category");
+  }, [getExpertCategories]);
 
   const handleQueryCategorySelect = useCallback(
     (cat: ExpertCategory) => {
@@ -2401,26 +2521,22 @@ function ChatWidgetInner() {
         const { category, ...rest } = prev;
         return rest;
       });
-      pushMessage("user", cat.name);
-      simulateTyping(ts("gotItTitleDetails"));
       setFlowStep("query-form");
     },
-    [handleRequestQueryChange, pushMessage, simulateTyping, ts],
+    [handleRequestQueryChange],
   );
 
   const handleSkipQueryCategory = useCallback(() => {
     setSelectedQueryCategory(null);
     handleRequestQueryChange({
-      target: { name: "category", value: "General" },
+      target: { name: "category", value: activeCategory?.name || "General" },
     } as ChangeEvent<HTMLInputElement>);
     setLocalValidationErrors((prev) => {
       const { category, ...rest } = prev;
       return rest;
     });
-    pushMessage("user", ts("notSureSkip"));
-    simulateTyping(ts("noProblemTitleDetails"));
     setFlowStep("query-form");
-  }, [handleRequestQueryChange, pushMessage, simulateTyping, ts]);
+  }, [handleRequestQueryChange, activeCategory]);
 
   const handleRaiseQueryFromEnd = useCallback(() => {
     handleStartQueryForm();
@@ -2676,6 +2792,7 @@ function ChatWidgetInner() {
     !!savedContact &&
     (
       [
+        "faq-categories",
         "mentor-topics",
         "mentor-chat",
         "query-category",
@@ -2765,7 +2882,7 @@ function ChatWidgetInner() {
               {cats.map((cat, i) => (
                 <button
                   key={cat.category_generated_id || i}
-                  className="cw-faqlist-item"
+                  className={`cw-faqlist-item ${activeCategory?.id && cat.category_generated_id && activeCategory.id === cat.category_generated_id ? "cw-faqlist-item--active" : ""}`}
                   style={{ animationDelay: `${i * 0.05}s` }}
                   onClick={() => handleCategorySelect(cat)}
                   type="button"
@@ -3105,7 +3222,7 @@ function ChatWidgetInner() {
               <button
                 type="button"
                 className="cw-query-category-change"
-                onClick={() => setFlowStep("query-category")}
+                onClick={handleOpenQueryCategoryChange}
               >
                 {ts("change")}
               </button>
@@ -3359,7 +3476,7 @@ function ChatWidgetInner() {
           ) : (
             <>
               <div className="cw-header">
-                {flowStep !== "faq-list" && (
+                {flowStep !== "faq-list" && flowStep !== "faq-categories" && (
                   <button
                     className="cw-header-back-btn"
                     onClick={handleBack}
@@ -3416,6 +3533,23 @@ function ChatWidgetInner() {
                   </button>
                 </div>
               </div>
+              {activeCategory && (
+                <div className="cw-topic-banner">
+                  <span className="cw-topic-banner-label">
+                    <Folder size={13} />
+                    <span className="cw-topic-banner-text">
+                      {activeCategory.name}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="cw-topic-banner-change"
+                    onClick={handleChangeActiveTopic}
+                  >
+                    {ts("change")}
+                  </button>
+                </div>
+              )}
               <div className="cw-messages" aria-live="polite">
                 {flowStep === "live-chat" ? (
                   chatbotMessages.map((cm, i) => (
@@ -3863,4 +3997,3 @@ export default function ChatWidget() {
     </FAQProvider>
   );
 }
-

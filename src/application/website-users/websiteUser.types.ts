@@ -1,4 +1,17 @@
 // ======================================================
+// WEBSITE USER SESSION
+// ======================================================
+
+export interface WebsiteUserSession {
+  session_generated_id: string;
+  name: string;
+  email: string;
+  phone_number: string;
+  registerd_employee_generated_id: string;
+  logged_in_at: Date;
+}
+
+// ======================================================
 // WEBSITE USER
 // ======================================================
 
@@ -10,6 +23,8 @@ export interface WebsiteUser {
   registered_at?: Date;
   created_at?: Date;
   updated_at?: Date;
+  sessions?: WebsiteUserSession[];
+  total_sessions?: number;
 }
 
 // ======================================================
@@ -31,6 +46,8 @@ export interface WebsiteUserApiResponse {
   message?: string;
   data?: WebsiteUser;
   isExistingUser?: boolean;
+  registerd_employee_generated_id?: string;
+  total_sessions?: number;
 }
 
 export interface WebsiteUsersApiResponse {
