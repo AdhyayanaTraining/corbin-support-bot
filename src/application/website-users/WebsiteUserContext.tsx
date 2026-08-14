@@ -26,6 +26,7 @@ import WebsiteUserService from "./websiteUser.service";
 
 import {
   WebsiteUser,
+  WebsiteUserSession,
   CreateWebsiteUserPayload,
   EMPTY_WEBSITE_USER,
 } from "./websiteUser.types";
@@ -48,6 +49,7 @@ export interface WebsiteUserAddResult {
   isExistingUser?: boolean;
   data?: WebsiteUser;
   registeredEmployeeId?: string;
+  totalSessions?: number;
   message?: string;
   errors?: WebsiteUserValidationErrors;
 }
@@ -67,6 +69,7 @@ interface WebsiteUserContextType {
   successMessage: string;
   errorMessage: string;
   registeredEmployeeId: string;
+  totalSessions: number;
 
   setSelectedWebsiteUserData: (websiteUser: WebsiteUser) => void;
   handleChange: (e: ChangeEvent<HTMLInputElement>) => void;
@@ -149,6 +152,12 @@ export const WebsiteUserProvider = ({ children }: { children: ReactNode }) => {
   const [registeredEmployeeId, setRegisteredEmployeeId] = useState("");
 
   // ======================================================
+  // TOTAL SESSIONS
+  // ======================================================
+
+  const [totalSessions, setTotalSessions] = useState(0);
+
+  // ======================================================
   // CLEAR MESSAGES
   // ======================================================
 
@@ -196,6 +205,7 @@ export const WebsiteUserProvider = ({ children }: { children: ReactNode }) => {
     setSuccessMessage("");
     setErrorMessage("");
     setRegisteredEmployeeId("");
+    setTotalSessions(0);
   };
 
   // ======================================================
@@ -211,9 +221,18 @@ export const WebsiteUserProvider = ({ children }: { children: ReactNode }) => {
       phone_number: selected.phone_number,
     });
 
+    if (selected.registerd_employee_generated_id) {
+      setRegisteredEmployeeId(selected.registerd_employee_generated_id);
+    }
+
+    if (selected.total_sessions) {
+      setTotalSessions(selected.total_sessions);
+    }
+
     setErrors({});
     clearMessages();
   };
+
   // ======================================================
   // ADD WEBSITE USER
   // ======================================================
@@ -239,28 +258,37 @@ export const WebsiteUserProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, message: response.message };
       }
 
+      // Get the ID from either response field or data
+      const employeeId =
+        response.registerd_employee_generated_id ||
+        response.data?.registerd_employee_generated_id;
+
+      const sessionCount =
+        response.total_sessions ||
+        response.data?.total_sessions ||
+        1;
+
+      // Set states
+      setRegisteredEmployeeId(employeeId || "");
+      setTotalSessions(sessionCount);
+
       // Check if this is an existing user
       if (response.isExistingUser && response.data) {
         setDuplicateUser(response.data);
         setIsDuplicateUser(true);
-        setRegisteredEmployeeId(
-          response.data.registerd_employee_generated_id || "",
-        );
         setSuccessMessage(
-          "A user with these credentials already exists. Showing existing user details.",
+          `Welcome back! Session #${sessionCount} recorded.`,
         );
 
-        // RETURN THE DATA DIRECTLY
+        // RETURN THE DATA DIRECTLY with explicit fields
         return {
           success: true,
           isExistingUser: true,
           data: response.data,
-          registeredEmployeeId: response.data.registerd_employee_generated_id,
+          registeredEmployeeId: employeeId,  // Use the extracted ID
+          totalSessions: sessionCount,
         };
       } else if (response.data) {
-        setRegisteredEmployeeId(
-          response.data.registerd_employee_generated_id || "",
-        );
         setSuccessMessage("Website user added successfully.");
 
         // RETURN THE DATA DIRECTLY
@@ -268,7 +296,8 @@ export const WebsiteUserProvider = ({ children }: { children: ReactNode }) => {
           success: true,
           isExistingUser: false,
           data: response.data,
-          registeredEmployeeId: response.data.registerd_employee_generated_id,
+          registeredEmployeeId: employeeId,  // Use the extracted ID
+          totalSessions: sessionCount,
         };
       }
 
@@ -440,6 +469,7 @@ export const WebsiteUserProvider = ({ children }: { children: ReactNode }) => {
     successMessage,
     errorMessage,
     registeredEmployeeId,
+    totalSessions,
 
     setSelectedWebsiteUserData,
     handleChange,
