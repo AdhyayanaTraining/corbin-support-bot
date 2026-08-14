@@ -1,16 +1,8 @@
 import { AskQuestionPayload } from "./chatbot.types";
 
-// ======================================================
-// VALIDATION ERRORS
-// ======================================================
-
 export interface ChatValidationErrors {
   question?: string;
 }
-
-// ======================================================
-// VALIDATE QUESTION
-// ======================================================
 
 export function validateQuestion(
   payload: AskQuestionPayload,

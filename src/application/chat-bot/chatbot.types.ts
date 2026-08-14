@@ -3,9 +3,15 @@
 // ======================================================
 
 export interface ChatMessage {
+  id?: string;
+
   role: "user" | "assistant";
 
   content: string;
+
+  source?: string;
+
+  answerBlocks?: any;
 }
 
 // ======================================================
@@ -13,11 +19,11 @@ export interface ChatMessage {
 // ======================================================
 
 export interface ChatSource {
-  document_id: string;
+  document_id?: string;
 
-  chunk_index: number;
+  chunk_index?: number;
 
-  score: number;
+  score?: number;
 }
 
 // ======================================================
@@ -28,6 +34,10 @@ export interface ChatResponse {
   answer: string;
 
   sources: ChatSource[];
+
+  source: "faq" | "rag";
+
+  faq_generated_id?: string;
 }
 
 // ======================================================
@@ -39,11 +49,13 @@ export interface AskQuestionPayload {
 
   language: string;
 }
+
 // ======================================================
 // EMPTY PAYLOAD
 // ======================================================
 
 export const EMPTY_CHAT_PAYLOAD: AskQuestionPayload = {
   question: "",
+
   language: "en",
 };

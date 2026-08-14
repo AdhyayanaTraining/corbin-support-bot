@@ -15,7 +15,13 @@ import {
 
 class FAQService {
   // =====================================================
-  // FAQ
+  // CREATE FAQ
+  //
+  // Root FAQ contains only:
+  // - faq_default_question
+  // - faq_created_by
+  //
+  // SEO metadata belongs to individual questions.
   // =====================================================
 
   async createFAQ(payload: CreateFAQPayload) {
@@ -53,11 +59,15 @@ class FAQService {
 
   // =====================================================
   // UPDATE FAQ
+  //
+  // IMPORTANT:
+  // Root FAQ no longer contains SEO metadata.
   // =====================================================
 
   async updateFAQ(faq_generated_id: string, payload: UpdateFAQPayload) {
     const response = await axiosClient.put("/faq/update", {
       faq_generated_id,
+
       faq_default_question: payload.faq_default_question,
     });
 
@@ -134,6 +144,13 @@ class FAQService {
 
   // =====================================================
   // CATEGORY QUESTION
+  //
+  // Each question owns its SEO metadata.
+  //
+  // question_text
+  // meta_title
+  // meta_description
+  // meta_keywords
   // =====================================================
 
   async addCategoryQuestion(
@@ -143,8 +160,16 @@ class FAQService {
   ) {
     const response = await axiosClient.post("/faq/category/question/add", {
       faq_generated_id,
+
       category_generated_id,
+
       question_text: payload.question_text,
+
+      meta_title: payload.meta_title,
+
+      meta_description: payload.meta_description,
+
+      meta_keywords: payload.meta_keywords,
     });
 
     return response.data;
@@ -152,6 +177,8 @@ class FAQService {
 
   // =====================================================
   // UPDATE CATEGORY QUESTION
+  //
+  // Metadata is updated together with the question.
   // =====================================================
 
   async updateCategoryQuestion(
@@ -162,9 +189,18 @@ class FAQService {
   ) {
     const response = await axiosClient.put("/faq/category/question/update", {
       faq_generated_id,
+
       category_generated_id,
+
       question_generated_id,
+
       question_text: payload.question_text,
+
+      meta_title: payload.meta_title,
+
+      meta_description: payload.meta_description,
+
+      meta_keywords: payload.meta_keywords,
     });
 
     return response.data;
@@ -202,7 +238,9 @@ class FAQService {
   ) {
     const response = await axiosClient.post("/faq/category/answer/add", {
       faq_generated_id,
+
       category_generated_id,
+
       question_generated_id,
 
       answer_description: payload.answer_description,
@@ -224,8 +262,11 @@ class FAQService {
   ) {
     const response = await axiosClient.put("/faq/category/answer/update", {
       faq_generated_id,
+
       category_generated_id,
+
       question_generated_id,
+
       answer_generated_id,
 
       answer_description: payload.answer_description,
@@ -247,9 +288,27 @@ class FAQService {
     const response = await axiosClient.delete("/faq/category/answer/delete", {
       data: {
         faq_generated_id,
+
         category_generated_id,
+
         question_generated_id,
+
         answer_generated_id,
+      },
+    });
+
+    return response.data;
+  }
+
+  // =====================================================
+  // SEARCH FAQS
+  // =====================================================
+
+  async searchFAQs(query: string, language: string = "en") {
+    const response = await axiosClient.get("/faq/search", {
+      params: {
+        q: query,
+        language,
       },
     });
 

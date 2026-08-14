@@ -27,20 +27,34 @@ export interface FAQAnswerValidationErrors {
 
 export interface FAQQuestionValidationErrors {
   question_text?: string;
+
+  meta_title?: string;
+
+  meta_description?: string;
+
+  meta_keywords?: string;
 }
 
 // ======================================================
 // VALIDATE FAQ
+//
+// IMPORTANT:
+// Root FAQ only contains the main/default question.
+//
+// SEO metadata does NOT belong here anymore.
+//
+// Metadata belongs to individual questions
+// inside categories.
 // ======================================================
 
 export function validateFAQ(faq: CreateFAQPayload): FAQValidationErrors {
   const errors: FAQValidationErrors = {};
 
   // ====================================================
-  // FAQ DEFAULT QUESTION
+  // DEFAULT QUESTION
   // ====================================================
 
-  if (!faq.faq_default_question.trim()) {
+  if (!faq.faq_default_question || !faq.faq_default_question.trim()) {
     errors.faq_default_question = "FAQ question is required.";
   } else if (faq.faq_default_question.trim().length < 10) {
     errors.faq_default_question =
@@ -52,6 +66,17 @@ export function validateFAQ(faq: CreateFAQPayload): FAQValidationErrors {
 
 // ======================================================
 // VALIDATE QUESTION
+//
+// IMPORTANT:
+// Each category question owns its own SEO metadata:
+//
+// question_text
+// meta_title
+// meta_description
+// meta_keywords
+//
+// Therefore all validation for those fields
+// happens here.
 // ======================================================
 
 export function validateFAQQuestion(
@@ -63,10 +88,38 @@ export function validateFAQQuestion(
   // QUESTION TEXT
   // ====================================================
 
-  if (!question.question_text.trim()) {
+  if (!question.question_text || !question.question_text.trim()) {
     errors.question_text = "Question is required.";
   } else if (question.question_text.trim().length < 3) {
     errors.question_text = "Question must be at least 3 characters.";
+  }
+
+  // ====================================================
+  // META TITLE
+  // ====================================================
+
+  if (question.meta_title && question.meta_title.trim().length > 150) {
+    errors.meta_title = "Meta title must not exceed 150 characters.";
+  }
+
+  // ====================================================
+  // META DESCRIPTION
+  // ====================================================
+
+  if (
+    question.meta_description &&
+    question.meta_description.trim().length > 300
+  ) {
+    errors.meta_description =
+      "Meta description must not exceed 300 characters.";
+  }
+
+  // ====================================================
+  // META KEYWORDS
+  // ====================================================
+
+  if (question.meta_keywords && question.meta_keywords.trim().length > 500) {
+    errors.meta_keywords = "Meta keywords must not exceed 500 characters.";
   }
 
   return errors;
@@ -104,6 +157,10 @@ function validateAnswerBlock(
     return undefined;
   }
 
+  // ====================================================
+  // INVALID BLOCK
+  // ====================================================
+
   return `Invalid content block at position ${index + 1}.`;
 }
 
@@ -131,7 +188,7 @@ export function validateFAQAnswer(
   }
 
   // ====================================================
-  // VALIDATE BLOCKS
+  // VALIDATE EVERY BLOCK
   // ====================================================
 
   for (let index = 0; index < answer.answer_description.length; index++) {
