@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useRef, useEffect, useContext } from "react";
 import { Globe, ChevronDown, Check, ArrowLeft } from "lucide-react";
 import type { SupportedLanguage, Translations } from "../types";
+import { ChatbotSettingContext } from "@/src/application/chatbot-setting/chatbot_setting.context";
 import "./style.css";
 
 export const LANGUAGE_STORAGE_KEY = "nimobot_selected_language";
@@ -728,6 +730,16 @@ export function getTranslation(
   return t[key];
 }
 
+// Custom hook to get dynamic welcome message
+export function useDynamicWelcomeMessage() {
+  const chatbotSettingContext = useContext(ChatbotSettingContext);
+  const customWelcomeMessage = chatbotSettingContext?.settings?.welcome_message;
+
+  return (fallbackMessage: string): string => {
+    return customWelcomeMessage || fallbackMessage;
+  };
+}
+
 interface LanguageDropdownProps {
   currentLanguage: string;
   onSelect: (code: string) => void;
@@ -804,10 +816,7 @@ interface LanguageModuleProps {
   onLanguageSelect: (languageCode: string) => void;
 }
 
-export function LanguageModule({
-  ts,
-  onLanguageSelect,
-}: LanguageModuleProps) {
+export function LanguageModule({ ts, onLanguageSelect }: LanguageModuleProps) {
   return (
     <div className="cw-language-selector">
       <div className="cw-language-header">

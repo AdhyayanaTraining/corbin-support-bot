@@ -9,6 +9,7 @@ import { WebsiteUserProvider } from "../website-users/WebsiteUserContext";
 import { RequestQueryProvider } from "../request_a_query/RequestQueryContext";
 import { ChatProvider } from "../live-chat/ChatContext";
 import { UserProvider } from "../users/UserContext";
+import { ChatbotSettingProvider } from "../chatbot-setting/chatbot_setting.context";
 
 interface AppProviderProps {
   children: ReactNode;
@@ -22,7 +23,9 @@ export default function AppProvider({ children }: AppProviderProps) {
           <WebsiteUserProvider>
             <RequestQueryProvider>
               <ChatProvider>
-                <UserProvider>{children}</UserProvider>
+                <UserProvider>
+                  <ChatbotSettingProvider>{children}</ChatbotSettingProvider>
+                </UserProvider>
               </ChatProvider>
             </RequestQueryProvider>
           </WebsiteUserProvider>
