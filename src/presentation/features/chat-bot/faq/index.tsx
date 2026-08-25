@@ -1,9 +1,20 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
-import { MessageSquare, Folder, FileText, MessageSquareWarning, ZoomIn } from "lucide-react";
+import {
+  MessageSquare,
+  Folder,
+  FileText,
+  MessageSquareWarning,
+  ZoomIn,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import type { FAQ, FAQCategory, FAQQuestion } from "@/src/application/faq/faq.types";
+import type {
+  FAQ,
+  FAQCategory,
+  FAQQuestion,
+} from "@/src/application/faq/faq.types";
 import type {
   FlowStep,
   ActiveTopicCategory,
@@ -23,7 +34,10 @@ interface FaqModuleProps {
   selectedLanguage: string;
   ts: (key: keyof Translations) => string;
   getLocalizedText: (value: any, language: string) => string;
-  getLatestAnswerBlocks: (question: FAQQuestion, language: string) => FAQMessageBlock[];
+  getLatestAnswerBlocks: (
+    question: FAQQuestion,
+    language: string,
+  ) => FAQMessageBlock[];
   formatParagraphText: (text: string) => string;
   onFaqSelect: (faq: FAQ) => void;
   onCategorySelect: (cat: FAQCategory) => void;
@@ -138,10 +152,8 @@ export function FaqModule({
               >
                 <Folder size={14} />
                 <span>
-                  {getLocalizedText(
-                    cat.topic_name,
-                    selectedLanguage || "en",
-                  ) || ts("unknown")}
+                  {getLocalizedText(cat.topic_name, selectedLanguage || "en") ||
+                    ts("unknown")}
                 </span>
               </button>
             ))}
@@ -194,10 +206,7 @@ export function FaqModule({
               >
                 <FileText size={14} />
                 <span>
-                  {getLocalizedText(
-                    q.question_text,
-                    selectedLanguage || "en",
-                  )}
+                  {getLocalizedText(q.question_text, selectedLanguage || "en")}
                 </span>
               </button>
             ))}
@@ -238,7 +247,9 @@ export function FaqModule({
                             <button
                               type="button"
                               className="cw-article-image-btn"
-                              onClick={() => onSetPreviewImage(block.image_url!)}
+                              onClick={() =>
+                                onSetPreviewImage(block.image_url!)
+                              }
                               aria-label="Open image in full screen"
                             >
                               <img

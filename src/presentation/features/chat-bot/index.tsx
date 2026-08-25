@@ -12,6 +12,7 @@ import {
   FormEvent,
   ChangeEvent,
   useCallback,
+  useContext,
 } from "react";
 import {
   User,
@@ -44,6 +45,10 @@ import {
 } from "@/src/application/request_a_query/RequestQueryContext";
 import { ChatProvider, useChat } from "@/src/application/live-chat/ChatContext";
 import { UserProvider, useUser } from "@/src/application/users/UserContext";
+import {
+  ChatbotSettingProvider,
+  ChatbotSettingContext,
+} from "@/src/application/chatbot-setting/chatbot_setting.context";
 import type {
   FAQ,
   FAQCategory,
@@ -79,6 +84,17 @@ import LanguageModule, {
   getTranslation,
   getLocalizedText,
 } from "./language";
+
+// Custom hook for chatbot settings
+const useChatbotSetting = () => {
+  const context = useContext(ChatbotSettingContext);
+  if (context === undefined) {
+    throw new Error(
+      "useChatbotSetting must be used within a ChatbotSettingProvider",
+    );
+  }
+  return context;
+};
 
 const convertAnswerToBlocks = (
   answer: any,
@@ -200,7 +216,7 @@ const CONTACT_STORAGE_KEY = "nimobot_contact_details";
 const FAQ_TOPIC_STORAGE_KEY = "nimobot_selected_faq_topic";
 const LAUNCHER_SIZE = 84;
 
-// LauncherBotVideo
+// LauncherBotVideo - UNCHANGED
 function LauncherBotVideo({ onClick }: { onClick: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -287,14 +303,20 @@ function LauncherBotVideo({ onClick }: { onClick: () => void }) {
   );
 }
 
-// NimoBotProfile
-function NimoBotProfile() {
+// NimoBotProfile - Updated to use dynamic image
+function NimoBotProfile({ welcomeImage }: { welcomeImage?: string }) {
   return (
     <div className="cw-nimo-profile">
       <img
-        src="/bot-standing-image.png"
-        alt="Nimo Bot"
+        src={welcomeImage || "/bot-standing-image.png"}
+        alt="Bot"
         className="cw-nimo-profile-img"
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: "50%",
+          objectFit: "cover",
+        }}
       />
     </div>
   );
@@ -404,6 +426,9 @@ function ChatWidgetInner() {
     loading: expertsLoading,
   } = useUser();
 
+  // Get chatbot settings for dynamic profile image and welcome message
+  const { settings: chatbotSettings } = useChatbotSetting();
+
   const isEmbedded =
     typeof window !== "undefined" && window.self !== window.top;
   const [isOpen, setIsOpen] = useState(false);
@@ -467,7 +492,18 @@ function ChatWidgetInner() {
     [selectedLanguage],
   );
 
-  // Language initialization
+  // Helper function to get welcome message
+  const getWelcomeMessage = useCallback(
+    (language?: string): string => {
+      const fallbackMessage = (
+        translations[language as SupportedLanguage] || translations.en
+      ).welcomeMessage;
+      return chatbotSettings.welcome_message || fallbackMessage;
+    },
+    [chatbotSettings.welcome_message],
+  );
+
+  // Language initialization with dynamic welcome message
   useEffect(() => {
     try {
       const savedLang = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -475,14 +511,12 @@ function ChatWidgetInner() {
         changeLanguage(savedLang);
         setFAQLanguage(savedLang);
         setShowLanguageSelector(false);
-        const msg = (
-          translations[savedLang as SupportedLanguage] || translations.en
-        ).welcomeMessage;
+        const msg = getWelcomeMessage(savedLang);
         setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
       }
     } catch (err) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getWelcomeMessage]);
 
   const handleLanguageSelect = useCallback(
     (languageCode: string) => {
@@ -492,12 +526,10 @@ function ChatWidgetInner() {
       try {
         window.localStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
       } catch (err) {}
-      const msg =
-        translations[languageCode as SupportedLanguage]?.welcomeMessage ||
-        translations.en.welcomeMessage;
+      const msg = getWelcomeMessage(languageCode);
       setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
     },
-    [changeLanguage, setFAQLanguage],
+    [changeLanguage, setFAQLanguage, getWelcomeMessage],
   );
 
   // Contact storage
@@ -938,9 +970,7 @@ function ChatWidgetInner() {
     resetRequestQueryForm();
     resetMentorConversation();
     resetMentorMessage();
-    const msg = (
-      translations[selectedLanguage as SupportedLanguage] || translations.en
-    ).welcomeMessage;
+    const msg = getWelcomeMessage(selectedLanguage || "en");
     setMessages([{ id: "greet-1", sender: "bot", text: msg }]);
   }, [
     flowStep,
@@ -953,6 +983,7 @@ function ChatWidgetInner() {
     resetMentorConversation,
     resetMentorMessage,
     selectedLanguage,
+    getWelcomeMessage,
   ]);
 
   const handleCloseLanguageSelector = useCallback(() => {
@@ -1245,14 +1276,26 @@ function ChatWidgetInner() {
       content: ts("chatWithBot"),
     });
 
+    // Use custom welcome message if available, otherwise use translation
+    const chatMessage = chatbotSettings.welcome_message
+      ? chatbotSettings.welcome_message
+      : (t("youAreNowChatting") as (name: string) => string)(c.name);
+
     addMessage({
       id: `${Date.now()}-assistant-${Math.random()}`,
       role: "assistant",
-      content: (t("youAreNowChatting") as (name: string) => string)(c.name),
+      content: chatMessage,
     });
 
     setFlowStep("live-chat");
-  }, [savedContact, mentorForm, addMessage, ts, t]);
+  }, [
+    savedContact,
+    mentorForm,
+    addMessage,
+    ts,
+    t,
+    chatbotSettings.welcome_message,
+  ]);
 
   const handleResumeConversation = useCallback(() => {
     pushMessage("user", ts("resumeConversation"));
@@ -1539,34 +1582,34 @@ function ChatWidgetInner() {
     flowStep === "faq-list"
       ? "Nimo Bot"
       : flowStep === "faq-categories"
-      ? getLocalizedText(
-          selectedFAQ?.faq_default_question,
-          selectedLanguage || "en",
-        ) || ts("categories")
-      : flowStep === "faq-questions"
-      ? getLocalizedText(
-          selectedCategory?.topic_name,
-          selectedLanguage || "en",
-        ) || ts("questions")
-      : flowStep === "mentor-form"
-      ? ts("contactSupport")
-      : flowStep === "query-category"
-      ? ts("raiseAQuery")
-      : flowStep === "query-form"
-      ? ts("raiseAQuery")
-      : flowStep === "live-chat"
-      ? ts("chatWithBot")
-      : flowStep === "mentor-topics"
-      ? ts("talkToMentor")
-      : flowStep === "mentor-resume-choice"
-      ? ts("talkToMentor")
-      : flowStep === "mentor-options"
-      ? ts("howCanWeHelp")
-      : flowStep === "mentor-chat"
-      ? (autoSelectedExpert?.name ??
-        selectedConversation?.category_name ??
-        ts("mentorChat"))
-      : "Next Steps";
+        ? getLocalizedText(
+            selectedFAQ?.faq_default_question,
+            selectedLanguage || "en",
+          ) || ts("categories")
+        : flowStep === "faq-questions"
+          ? getLocalizedText(
+              selectedCategory?.topic_name,
+              selectedLanguage || "en",
+            ) || ts("questions")
+          : flowStep === "mentor-form"
+            ? ts("contactSupport")
+            : flowStep === "query-category"
+              ? ts("raiseAQuery")
+              : flowStep === "query-form"
+                ? ts("raiseAQuery")
+                : flowStep === "live-chat"
+                  ? ts("chatWithBot")
+                  : flowStep === "mentor-topics"
+                    ? ts("talkToMentor")
+                    : flowStep === "mentor-resume-choice"
+                      ? ts("talkToMentor")
+                      : flowStep === "mentor-options"
+                        ? ts("howCanWeHelp")
+                        : flowStep === "mentor-chat"
+                          ? (autoSelectedExpert?.name ??
+                            selectedConversation?.category_name ??
+                            ts("mentorChat"))
+                          : "Next Steps";
 
   const displayContact = savedContact ?? mentorForm;
   const showHomeButton =
@@ -1602,7 +1645,9 @@ function ChatWidgetInner() {
             <>
               <div className="cw-header">
                 <div className="cw-header-icon">
-                  <NimoBotProfile />
+                  <NimoBotProfile
+                    welcomeImage={chatbotSettings.welcome_image}
+                  />
                 </div>
                 <div className="cw-header-meta">
                   <div className="cw-header-title">{ts("chooseLanguage")}</div>
@@ -1641,7 +1686,9 @@ function ChatWidgetInner() {
                   </button>
                 )}
                 <div className="cw-header-icon">
-                  <NimoBotProfile />
+                  <NimoBotProfile
+                    welcomeImage={chatbotSettings.welcome_image}
+                  />
                 </div>
                 <div className="cw-header-meta">
                   <div className="cw-header-title">{headerTitle}</div>
@@ -1652,8 +1699,8 @@ function ChatWidgetInner() {
                           ? selectedConversation?.status === "ACTIVE"
                             ? ""
                             : selectedConversation?.status === "CLOSED"
-                            ? "cw-status-dot--closed"
-                            : "cw-status-dot--waiting"
+                              ? "cw-status-dot--closed"
+                              : "cw-status-dot--waiting"
                           : ""
                       }`}
                     />
@@ -1662,8 +1709,8 @@ function ChatWidgetInner() {
                         ? selectedConversation?.status === "ACTIVE"
                           ? ts("mentorConnected")
                           : selectedConversation?.status === "CLOSED"
-                          ? ts("closed")
-                          : ts("waiting")
+                            ? ts("closed")
+                            : ts("waiting")
                         : ts("nimoBotOnline")}
                     </span>
                   </div>
@@ -1817,23 +1864,23 @@ function ChatWidgetInner() {
                         mentorFormStep === "name"
                           ? ts("fullNamePlaceholder")
                           : mentorFormStep === "mobile"
-                          ? ts("mobilePlaceholder")
-                          : ts("emailPlaceholder")
+                            ? ts("mobilePlaceholder")
+                            : ts("emailPlaceholder")
                       }
                       value={draft}
                       onChange={
                         mentorFormStep === "name"
                           ? handleNameInput
                           : mentorFormStep === "mobile"
-                          ? handleMobileInput
-                          : handleEmailInput
+                            ? handleMobileInput
+                            : handleEmailInput
                       }
                       type={
                         mentorFormStep === "email"
                           ? "email"
                           : mentorFormStep === "mobile"
-                          ? "tel"
-                          : "text"
+                            ? "tel"
+                            : "text"
                       }
                       disabled={isSavingContact}
                       autoFocus
@@ -1841,8 +1888,8 @@ function ChatWidgetInner() {
                         mentorFormStep === "mobile"
                           ? 15
                           : mentorFormStep === "name"
-                          ? 100
-                          : 255
+                            ? 100
+                            : 255
                       }
                     />
                     <button
@@ -1955,18 +2002,20 @@ function ChatWidgetInner() {
 
 export default function ChatWidget() {
   return (
-    <FAQProvider>
-      <ChatbotProvider>
-        <WebsiteUserProvider>
-          <RequestQueryProvider>
-            <UserProvider>
-              <ChatProvider>
-                <ChatWidgetInner />
-              </ChatProvider>
-            </UserProvider>
-          </RequestQueryProvider>
-        </WebsiteUserProvider>
-      </ChatbotProvider>
-    </FAQProvider>
+    <ChatbotSettingProvider>
+      <FAQProvider>
+        <ChatbotProvider>
+          <WebsiteUserProvider>
+            <RequestQueryProvider>
+              <UserProvider>
+                <ChatProvider>
+                  <ChatWidgetInner />
+                </ChatProvider>
+              </UserProvider>
+            </RequestQueryProvider>
+          </WebsiteUserProvider>
+        </ChatbotProvider>
+      </FAQProvider>
+    </ChatbotSettingProvider>
   );
 }

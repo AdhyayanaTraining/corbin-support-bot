@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { ChangeEvent, FormEvent } from "react";
 import {
   User,
@@ -141,7 +142,8 @@ export function RaiseAQueryModule({
             </label>
             <input
               className={`cw-query-input ${
-                requestQueryErrors.query_title || localValidationErrors.query_title
+                requestQueryErrors.query_title ||
+                localValidationErrors.query_title
                   ? "has-error"
                   : ""
               }`}

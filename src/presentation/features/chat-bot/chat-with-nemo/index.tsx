@@ -1,4 +1,6 @@
-import React from "react";
+/* eslint-disable react-hooks/static-components */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useContext } from "react";
 import {
   User,
   Phone,
@@ -18,7 +20,10 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import type { User as ExpertUser, ExpertCategory } from "@/src/application/users/user.types";
+import type {
+  User as ExpertUser,
+  ExpertCategory,
+} from "@/src/application/users/user.types";
 import type {
   FlowStep,
   MentorFormStep,
@@ -27,6 +32,7 @@ import type {
   Translations,
   Message,
 } from "../types";
+import { ChatbotSettingContext } from "@/src/application/chatbot-setting/chatbot_setting.context";
 import "./style.css";
 
 const MENTOR_STEPS: {
@@ -53,7 +59,10 @@ function MessageRenderer({ message, onImageClick }: MessageRendererProps) {
           if (block.type === "paragraph") {
             return (
               <div key={index} className="cw-article-paragraph">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                >
                   {block.text || ""}
                 </ReactMarkdown>
               </div>
@@ -86,7 +95,10 @@ function MessageRenderer({ message, onImageClick }: MessageRendererProps) {
 
   return (
     <>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+      >
         {message.text}
       </ReactMarkdown>
       {message.images && message.images.length > 0 && (
@@ -181,6 +193,29 @@ export function ChatWithNemoModule({
   onSetPreviewImage,
   messagesEndRef,
 }: ChatWithNemoModuleProps) {
+  // Get chatbot settings for dynamic profile image
+  const chatbotSettingContext = useContext(ChatbotSettingContext);
+  const welcomeImage = chatbotSettingContext?.settings?.welcome_image;
+
+  // Bot Avatar Component with dynamic image
+  const BotAvatar = ({ size = 13 }: { size?: number }) => {
+    if (welcomeImage) {
+      return (
+        <img
+          src={welcomeImage}
+          alt="Bot"
+          style={{
+            width: size,
+            height: size,
+            borderRadius: "50%",
+            objectFit: "cover",
+          }}
+        />
+      );
+    }
+    return <Bot size={size} />;
+  };
+
   // Render sub-flow cards
   const renderFlowContent = () => {
     if (flowStep === "mentor-form") {
@@ -198,7 +233,9 @@ export function ChatWithNemoModule({
                 {i < ci ? <Check size={12} /> : s.icon}
               </span>
               <span className="cw-progress-label">{ts(s.labelKey)}</span>
-              {i < MENTOR_STEPS.length - 1 && <span className="cw-progress-line" />}
+              {i < MENTOR_STEPS.length - 1 && (
+                <span className="cw-progress-line" />
+              )}
             </div>
           ))}
           {isSavingContact && (
@@ -291,7 +328,9 @@ export function ChatWithNemoModule({
               <MessageSquare size={20} />
             </div>
             <div className="cw-option-text">
-              <span className="cw-option-label">{ts("resumeConversation")}</span>
+              <span className="cw-option-label">
+                {ts("resumeConversation")}
+              </span>
               <span className="cw-option-desc">
                 {(t("resumeConversationDesc") as (name: string) => string)(
                   autoSelectedExpert?.name ??
@@ -382,96 +421,105 @@ export function ChatWithNemoModule({
 
   return (
     <>
-      {flowStep === "live-chat" ? (
-        chatbotMessages.map((cm, i) => (
-          <div
-            key={cm.id || `chat-${i}`}
-            className={`cw-msg ${cm.role === "user" ? "cw-msg--user" : ""}`}
-          >
+      {flowStep === "live-chat"
+        ? chatbotMessages.map((cm, i) => (
             <div
-              className={`cw-avatar ${
-                cm.role === "assistant" ? "cw-avatar--bot" : "cw-avatar--user"
-              }`}
+              key={cm.id || `chat-${i}`}
+              className={`cw-msg ${cm.role === "user" ? "cw-msg--user" : ""}`}
             >
-              {cm.role === "assistant" ? <Bot size={13} /> : <User size={12} />}
-            </div>
+              <div
+                className={`cw-avatar ${
+                  cm.role === "assistant" ? "cw-avatar--bot" : "cw-avatar--user"
+                }`}
+              >
+                {cm.role === "assistant" ? (
+                  <BotAvatar size={13} />
+                ) : (
+                  <User size={12} />
+                )}
+              </div>
 
-            <div
-              className={`cw-bubble ${
-                cm.role === "assistant" ? "cw-bubble--bot" : "cw-bubble--user"
-              } ${
-                cm.answerBlocks && cm.answerBlocks.length > 0
-                  ? "cw-bubble--article"
-                  : ""
-              }`}
-            >
-              {cm.role === "assistant" &&
-              cm.answerBlocks &&
-              cm.answerBlocks.length > 0 ? (
-                <MessageRenderer
-                  message={{
-                    id: cm.id || `chat-${i}`,
-                    sender: "bot",
-                    text: cm.content,
-                    answerBlocks: cm.answerBlocks,
-                  }}
-                  onImageClick={onSetPreviewImage}
-                />
-              ) : cm.role === "assistant" ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
-                >
-                  {cm.content}
-                </ReactMarkdown>
-              ) : (
-                cm.content
-              )}
+              <div
+                className={`cw-bubble ${
+                  cm.role === "assistant" ? "cw-bubble--bot" : "cw-bubble--user"
+                } ${
+                  cm.answerBlocks && cm.answerBlocks.length > 0
+                    ? "cw-bubble--article"
+                    : ""
+                }`}
+              >
+                {cm.role === "assistant" &&
+                cm.answerBlocks &&
+                cm.answerBlocks.length > 0 ? (
+                  <MessageRenderer
+                    message={{
+                      id: cm.id || `chat-${i}`,
+                      sender: "bot",
+                      text: cm.content,
+                      answerBlocks: cm.answerBlocks,
+                    }}
+                    onImageClick={onSetPreviewImage}
+                  />
+                ) : cm.role === "assistant" ? (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                  >
+                    {cm.content}
+                  </ReactMarkdown>
+                ) : (
+                  cm.content
+                )}
+              </div>
             </div>
-          </div>
-        ))
-      ) : (
-        showConversationHistory &&
-        messages.map((m) => (
-          <div
-            key={m.id}
-            className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
-          >
+          ))
+        : showConversationHistory &&
+          messages.map((m) => (
             <div
-              className={`cw-avatar ${
-                m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"
-              }`}
+              key={m.id}
+              className={`cw-msg ${m.sender === "user" ? "cw-msg--user" : ""}`}
             >
-              {m.sender === "bot" ? <Bot size={13} /> : <User size={12} />}
-            </div>
+              <div
+                className={`cw-avatar ${
+                  m.sender === "bot" ? "cw-avatar--bot" : "cw-avatar--user"
+                }`}
+              >
+                {m.sender === "bot" ? (
+                  <BotAvatar size={13} />
+                ) : (
+                  <User size={12} />
+                )}
+              </div>
 
-            <div
-              className={`cw-bubble ${
-                m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"
-              } ${
-                m.answerBlocks && m.answerBlocks.length > 0
-                  ? "cw-bubble--article"
-                  : ""
-              }`}
-            >
-              {m.sender === "bot" &&
-              m.answerBlocks &&
-              m.answerBlocks.length > 0 ? (
-                <MessageRenderer message={m} onImageClick={onSetPreviewImage} />
-              ) : m.sender === "bot" ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
-                >
-                  {m.text}
-                </ReactMarkdown>
-              ) : (
-                m.text
-              )}
+              <div
+                className={`cw-bubble ${
+                  m.sender === "bot" ? "cw-bubble--bot" : "cw-bubble--user"
+                } ${
+                  m.answerBlocks && m.answerBlocks.length > 0
+                    ? "cw-bubble--article"
+                    : ""
+                }`}
+              >
+                {m.sender === "bot" &&
+                m.answerBlocks &&
+                m.answerBlocks.length > 0 ? (
+                  <MessageRenderer
+                    message={m}
+                    onImageClick={onSetPreviewImage}
+                  />
+                ) : m.sender === "bot" ? (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                  >
+                    {m.text}
+                  </ReactMarkdown>
+                ) : (
+                  m.text
+                )}
+              </div>
             </div>
-          </div>
-        ))
-      )}
+          ))}
 
       {/* Mentor Chat */}
       {flowStep === "mentor-chat" && (
@@ -607,19 +655,20 @@ export function ChatWithNemoModule({
       {renderFlowContent()}
 
       {/* Typing / Loading Indicator */}
-      {showConversationHistory && (isTyping || chatbotLoading || faqSearchLoading) && (
-        <div className="cw-msg">
-          <div className="cw-avatar cw-avatar--bot">
-            <Bot size={13} />
-          </div>
+      {showConversationHistory &&
+        (isTyping || chatbotLoading || faqSearchLoading) && (
+          <div className="cw-msg">
+            <div className="cw-avatar cw-avatar--bot">
+              <BotAvatar size={13} />
+            </div>
 
-          <div className="cw-typing">
-            <span />
-            <span />
-            <span />
+            <div className="cw-typing">
+              <span />
+              <span />
+              <span />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       <div ref={messagesEndRef} />
     </>
