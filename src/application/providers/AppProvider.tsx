@@ -10,6 +10,7 @@ import { RequestQueryProvider } from "../request_a_query/RequestQueryContext";
 import { ChatProvider } from "../live-chat/ChatContext";
 import { UserProvider } from "../users/UserContext";
 import { ChatbotSettingProvider } from "../chatbot-setting/chatbot_setting.context";
+import { UnansweredQuestionProvider } from "../unasnwered-quetion/unanswered_question_context";
 
 interface AppProviderProps {
   children: ReactNode;
@@ -24,7 +25,11 @@ export default function AppProvider({ children }: AppProviderProps) {
             <RequestQueryProvider>
               <ChatProvider>
                 <UserProvider>
-                  <ChatbotSettingProvider>{children}</ChatbotSettingProvider>
+                  <ChatbotSettingProvider>
+                    <UnansweredQuestionProvider>
+                      {children}
+                    </UnansweredQuestionProvider>
+                  </ChatbotSettingProvider>
                 </UserProvider>
               </ChatProvider>
             </RequestQueryProvider>
