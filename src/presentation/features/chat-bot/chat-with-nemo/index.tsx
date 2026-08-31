@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/static-components */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import {
   User,
   Phone,
@@ -33,6 +33,7 @@ import type {
   Message,
 } from "../types";
 import { ChatbotSettingContext } from "@/src/application/chatbot-setting/chatbot_setting.context";
+import { useUnansweredQuestion } from "@/src/application/unasnwered-quetion/unanswered_question_context";
 import "./style.css";
 
 const MENTOR_STEPS: {
@@ -196,6 +197,117 @@ export function ChatWithNemoModule({
   // Get chatbot settings for dynamic profile image
   const chatbotSettingContext = useContext(ChatbotSettingContext);
   const welcomeImage = chatbotSettingContext?.settings?.welcome_image;
+
+  // Unanswered question context
+  const { createUnansweredQuestion } = useUnansweredQuestion();
+  // Ref to avoid duplicate submissions for the same message
+  const lastStoredQuestionRef = useRef<string | null>(null);
+
+  // Detect when the bot fails to answer and store the question
+  useEffect(() => {
+    // Only run when in live chat or conversation history mode
+    if (flowStep !== "live-chat" && !showConversationHistory) return;
+
+    const allMessages = flowStep === "live-chat" ? chatbotMessages : messages;
+
+    if (allMessages.length < 2) return; // need at least a user message and a bot reply
+
+    const lastBotMsg = [...allMessages]
+      .reverse()
+      .find((m) => m.role === "assistant" || m.sender === "bot");
+
+    if (!lastBotMsg) return;
+
+    const botText =
+      typeof lastBotMsg.text === "string"
+        ? lastBotMsg.text
+        : lastBotMsg.content || "";
+
+    // More comprehensive fallback phrases (case-insensitive)
+    const fallbackIndicators = [
+      "i don't know",
+      "i do not know",
+      "i couldn't find",
+      "i could not find",
+      "i'm sorry",
+      "i am sorry",
+      "i cannot answer",
+      "i can't answer",
+      "no answer found",
+      "unable to answer",
+      "i didn't understand",
+      "i did not understand",
+      "not able to find",
+      "not able to answer",
+      "no information found",
+      "no relevant information",
+      "i have no information",
+      "i don't have information",
+      "i do not have information",
+      "i couldn't find the answer",
+      "i could not find the answer",
+    ];
+
+    const isFallback = fallbackIndicators.some((phrase) =>
+      botText.toLowerCase().includes(phrase),
+    );
+
+    if (!isFallback) {
+      console.log("Not a fallback response:", botText);
+      return;
+    }
+
+    // Find the most recent user message before this bot message
+    const lastUserMsg = [...allMessages]
+      .slice(0, allMessages.indexOf(lastBotMsg))
+      .reverse()
+      .find((m) => m.role === "user" || m.sender === "user");
+
+    if (!lastUserMsg) return;
+
+    const userText =
+      typeof lastUserMsg.text === "string"
+        ? lastUserMsg.text
+        : lastUserMsg.content || "";
+
+    if (!userText.trim()) return;
+
+    // Avoid duplicate submissions for the same question
+    if (lastStoredQuestionRef.current === userText.trim()) {
+      console.log("Question already stored:", userText);
+      return;
+    }
+
+    // Determine topic: from selected conversation category or default
+    const topic =
+      selectedConversation?.category_name ||
+      selectedConversation?.topic ||
+      "General";
+
+    console.log("Storing unanswered question:", userText, "topic:", topic);
+
+    // Store the unanswered question
+    createUnansweredQuestion({
+      question: userText.trim(),
+      topic: topic.trim(),
+    })
+      .then((success) => {
+        if (success) {
+          lastStoredQuestionRef.current = userText.trim();
+          console.log("Unanswered question stored:", userText);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to store unanswered question:", err);
+      });
+  }, [
+    flowStep,
+    chatbotMessages,
+    messages,
+    showConversationHistory,
+    selectedConversation,
+    createUnansweredQuestion,
+  ]);
 
   // Bot Avatar Component with dynamic image
   const BotAvatar = ({ size = 13 }: { size?: number }) => {
