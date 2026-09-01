@@ -1120,10 +1120,9 @@ function ChatWidgetInner() {
     setFlowStep("faq-categories");
   }, [selectedFAQ, faqs]);
 
-  const handleQuestionSelect = useCallback((q: FAQQuestion) => {
+  const handleQuestionSelect = useCallback((q: FAQQuestion | null) => {
     setSelectedQuestion(q);
   }, []);
-
   const handleShowSatisfaction = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     pushMessage("user", ts("iNeedMoreHelp"));
@@ -1195,7 +1194,13 @@ function ChatWidgetInner() {
 
   const handleMentorFormSubmit = useCallback(() => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text) {
+      console.log("No draft text, returning");
+      return;
+    }
+
+    console.log("Current step:", mentorFormStep, "draft:", text);
+
     if (mentorFormStep === "name") {
       if (!isValidName(text)) {
         setFormError(ts("invalidName"));
@@ -1214,6 +1219,7 @@ function ChatWidgetInner() {
       simulateTyping(niceToMeetMsg);
       return;
     }
+
     if (mentorFormStep === "mobile") {
       if (!isValidMobile(text)) {
         setFormError(ts("invalidMobile"));
@@ -1228,21 +1234,32 @@ function ChatWidgetInner() {
       simulateTyping(ts("emailAddress"));
       return;
     }
+
+    // EMAIL STEP
+    console.log("Validating email:", text);
     if (!isValidEmail(text)) {
+      console.log("Invalid email");
       setFormError(ts("invalidEmail"));
       return;
     }
+
     setFormError(null);
     setLocalValidationErrors({});
     pushMessage("user", text);
+
     const finalForm: ContactDetails = {
       ...mentorForm,
       email: text,
       registered_employee_generated_id:
         savedContact?.registered_employee_generated_id || "",
     };
+
+    console.log("Final form before submission:", finalForm);
+
     setMentorForm(finalForm);
     setDraft("");
+
+    // Update the context's websiteUser state with the contact details
     handleWebsiteUserChange({
       target: { name: "name", value: finalForm.name },
     } as ChangeEvent<HTMLInputElement>);
@@ -1252,9 +1269,20 @@ function ChatWidgetInner() {
     handleWebsiteUserChange({
       target: { name: "email", value: finalForm.email },
     } as ChangeEvent<HTMLInputElement>);
+
+    // Store the contact for the async effect
     pendingContactRef.current = finalForm;
+
+    // ✅ RESET BLOCKERS – crucial for retries and consecutive submissions
+    hasSavedContact.current = false;
+    setIsSavingContact(false);
+
+    console.log("Triggering submission...");
     setIsTyping(true);
-    setSubmitTrigger((n) => n + 1);
+    setSubmitTrigger((n) => {
+      console.log("New submitTrigger value:", n + 1);
+      return n + 1;
+    });
   }, [
     draft,
     mentorFormStep,
@@ -1400,7 +1428,82 @@ function ChatWidgetInner() {
   const handleExitChat = useCallback(() => {
     setIsOpen(false);
   }, []);
+  const handleCloseChat = useCallback(() => {
+    // Clear typing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    setIsTyping(false);
 
+    // Leave active mentor room if any
+    if (
+      flowStep === "mentor-chat" &&
+      selectedConversation?.conversation_generated_id
+    ) {
+      leaveRoom(selectedConversation.conversation_generated_id);
+    }
+
+    // Reset all local state
+    setFlowStep("faq-list");
+    setSelectedFAQ(null);
+    setSelectedCategory(null);
+    setSelectedQuestion(null);
+    setActiveCategory(null);
+    setMentorForm({
+      name: "",
+      mobile: "",
+      email: "",
+      registered_employee_generated_id: "",
+    });
+    setMentorFormStep("name");
+    setFormError(null);
+    setSavedContact(null);
+    setIsSavingContact(false);
+    setSubmitTrigger(0);
+    pendingContactRef.current = null;
+    setQuerySubmitTrigger(0);
+    setAutoSelectedExpert(null);
+    setConnectingCategoryId(null);
+    setPreviewImage(null);
+    setConversationEnded(false);
+    conversationEndedNotifiedRef.current = false;
+    setSatisfactionStage(null);
+    setHasActiveConversation(false);
+    setLocalValidationErrors({});
+    hasSavedContact.current = false;
+    setDraft("");
+    setMessages([]);
+    setShowLanguageSelector(true); // show language chooser next time
+
+    // Clear localStorage (contact, topic, language)
+    try {
+      window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+      window.localStorage.removeItem(CONTACT_STORAGE_KEY);
+      window.localStorage.removeItem(FAQ_TOPIC_STORAGE_KEY);
+    } catch (err) {}
+
+    // Reset all context states
+    resetChatbotForm();
+    resetWebsiteUserForm();
+    clearWebsiteUserMessages();
+    resetRequestQueryForm();
+    resetMentorConversation();
+    resetMentorMessage();
+
+    // Close the widget
+    setIsOpen(false);
+  }, [
+    flowStep,
+    selectedConversation,
+    leaveRoom,
+    resetChatbotForm,
+    resetWebsiteUserForm,
+    clearWebsiteUserMessages,
+    resetRequestQueryForm,
+    resetMentorConversation,
+    resetMentorMessage,
+  ]);
   const handleBackToHome = useCallback(() => {
     handleStart();
   }, [handleStart]);
@@ -1658,7 +1761,8 @@ function ChatWidgetInner() {
                 </div>
                 <button
                   className="cw-header-close-language"
-                  onClick={handleCloseLanguageSelector}
+                  // onClick={handleCloseLanguageSelector}
+                  onClick={handleCloseChat}
                   type="button"
                   aria-label={ts("closeChat")}
                   title={ts("closeChat")}
@@ -1734,7 +1838,8 @@ function ChatWidgetInner() {
                   )}
                   <button
                     className="cw-close-btn"
-                    onClick={() => setIsOpen(false)}
+                    // onClick={() => setIsOpen(false)}
+                    onClick={handleCloseChat}
                     type="button"
                     aria-label={ts("closeChat")}
                     title={ts("closeChat")}
@@ -1855,6 +1960,7 @@ function ChatWidgetInner() {
                   )}
                   <form className="cw-input-row" onSubmit={handleSend}>
                     <input
+                      key={mentorFormStep} // 👈 Add this line
                       className={`cw-input ${
                         formError || localValidationErrors[mentorFormStep]
                           ? "has-error"

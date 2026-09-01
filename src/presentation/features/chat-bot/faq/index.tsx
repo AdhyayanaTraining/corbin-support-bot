@@ -6,6 +6,7 @@ import {
   FileText,
   MessageSquareWarning,
   ZoomIn,
+  ChevronDown,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -41,7 +42,7 @@ interface FaqModuleProps {
   formatParagraphText: (text: string) => string;
   onFaqSelect: (faq: FAQ) => void;
   onCategorySelect: (cat: FAQCategory) => void;
-  onQuestionSelect: (q: FAQQuestion) => void;
+  onQuestionSelect: (q: FAQQuestion | null) => void;
   onShowSatisfaction: () => void;
   onSetPreviewImage: (url: string) => void;
 }
@@ -65,6 +66,9 @@ export function FaqModule({
   onShowSatisfaction,
   onSetPreviewImage,
 }: FaqModuleProps) {
+  // Button is disabled ONLY if there is no selected category AND no active topic from storage
+  const helpDisabled = !selectedCategory && !activeCategory;
+
   if (flowStep === "faq-list") {
     return (
       <div className="cw-faqlist-wrap">
@@ -111,6 +115,7 @@ export function FaqModule({
           className="cw-help-btn"
           onClick={onShowSatisfaction}
           type="button"
+          disabled={helpDisabled}
         >
           <MessageSquareWarning size={16} className="cw-help-btn-icon" />
           <span className="cw-help-btn-text">
@@ -163,6 +168,7 @@ export function FaqModule({
           className="cw-help-btn"
           onClick={onShowSatisfaction}
           type="button"
+          disabled={helpDisabled}
         >
           <MessageSquareWarning size={16} className="cw-help-btn-icon" />
           <span className="cw-help-btn-text">
@@ -187,96 +193,102 @@ export function FaqModule({
             selectedLanguage || "en",
           ) || ts("questions")}
         </div>
+
         {questions.length === 0 ? (
           <div className="cw-empty-state">{ts("noQuestionsYet")}</div>
         ) : (
-          <div className="cw-faqlist-items">
-            {questions.map((q, i) => (
-              <button
-                key={q.question_generated_id || i}
-                className={`cw-faqlist-item ${
-                  selectedQuestion?.question_generated_id ===
-                  q.question_generated_id
-                    ? "cw-faqlist-item--active"
-                    : ""
-                }`}
-                style={{ animationDelay: `${i * 0.05}s` }}
-                onClick={() => onQuestionSelect(q)}
-                type="button"
-              >
-                <FileText size={14} />
-                <span>
-                  {getLocalizedText(q.question_text, selectedLanguage || "en")}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-        {selectedQuestion &&
-          (() => {
-            const blocks = getLatestAnswerBlocks(
-              selectedQuestion,
-              selectedLanguage || "en",
-            );
-            return (
-              <div className="cw-answer-box">
-                <div className="cw-answer-box-header">
-                  <MessageSquare size={14} />
-                  <span>
-                    {getLocalizedText(
-                      selectedQuestion.question_text,
-                      selectedLanguage || "en",
-                    )}
-                  </span>
-                </div>
-                {blocks.length > 0 ? (
-                  <div className="cw-article cw-article--inline">
-                    {blocks.map((block, bi) =>
-                      block.type === "paragraph" ? (
-                        <div key={bi} className="cw-article-paragraph">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                          >
-                            {formatParagraphText(block.text || "")}
-                          </ReactMarkdown>
+          <div className="cw-faq-accordion">
+            {questions.map((q, i) => {
+              const isOpen =
+                selectedQuestion?.question_generated_id ===
+                q.question_generated_id;
+              const blocks = getLatestAnswerBlocks(q, selectedLanguage || "en");
+
+              return (
+                <div
+                  key={q.question_generated_id || i}
+                  className={`cw-faq-accordion-item ${
+                    isOpen ? "cw-faq-accordion-item--open" : ""
+                  }`}
+                  style={{ animationDelay: `${i * 0.05}s` }}
+                >
+                  <button
+                    className="cw-faq-accordion-header"
+                    onClick={() => onQuestionSelect(isOpen ? null : q)}
+                    type="button"
+                    aria-expanded={isOpen}
+                  >
+                    <FileText size={14} className="cw-faq-accordion-icon" />
+                    <span className="cw-faq-accordion-question">
+                      {getLocalizedText(
+                        q.question_text,
+                        selectedLanguage || "en",
+                      )}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`cw-faq-accordion-chevron ${
+                        isOpen ? "cw-faq-accordion-chevron--open" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="cw-faq-accordion-content">
+                      {blocks.length > 0 ? (
+                        <div className="cw-article cw-article--inline">
+                          {blocks.map((block, bi) =>
+                            block.type === "paragraph" ? (
+                              <div key={bi} className="cw-article-paragraph">
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  rehypePlugins={[rehypeHighlight]}
+                                >
+                                  {formatParagraphText(block.text || "")}
+                                </ReactMarkdown>
+                              </div>
+                            ) : (
+                              block.image_url && (
+                                <figure key={bi} className="cw-article-figure">
+                                  <button
+                                    type="button"
+                                    className="cw-article-image-btn"
+                                    onClick={() =>
+                                      onSetPreviewImage(block.image_url!)
+                                    }
+                                    aria-label="Open image in full screen"
+                                  >
+                                    <img
+                                      src={block.image_url}
+                                      alt={`Illustration ${bi + 1}`}
+                                      className="cw-article-image"
+                                      loading="lazy"
+                                    />
+                                    <span className="cw-article-image-zoom">
+                                      <ZoomIn size={14} />
+                                    </span>
+                                  </button>
+                                </figure>
+                              )
+                            ),
+                          )}
                         </div>
                       ) : (
-                        block.image_url && (
-                          <figure key={bi} className="cw-article-figure">
-                            <button
-                              type="button"
-                              className="cw-article-image-btn"
-                              onClick={() =>
-                                onSetPreviewImage(block.image_url!)
-                              }
-                              aria-label="Open image in full screen"
-                            >
-                              <img
-                                src={block.image_url}
-                                alt={`Illustration ${bi + 1}`}
-                                className="cw-article-image"
-                                loading="lazy"
-                              />
-                              <span className="cw-article-image-zoom">
-                                <ZoomIn size={14} />
-                              </span>
-                            </button>
-                          </figure>
-                        )
-                      ),
-                    )}
-                  </div>
-                ) : (
-                  <p className="cw-answer-empty">{ts("noAnswerYet")}</p>
-                )}
-              </div>
-            );
-          })()}
+                        <p className="cw-answer-empty">{ts("noAnswerYet")}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <button
           className="cw-help-btn"
           onClick={onShowSatisfaction}
           type="button"
+          disabled={helpDisabled}
         >
           <MessageSquareWarning size={16} className="cw-help-btn-icon" />
           <span className="cw-help-btn-text">
