@@ -427,6 +427,9 @@ body {
   padding: 18px 20px;
   background: var(--cw-bg-soft) !important;
   scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* prevents overflow issues */
 }
 
 @keyframes cw-msg-in {
@@ -822,4 +825,10 @@ body {
   .cw-language-header {
     margin-bottom: 28px;
   }
+}
+
+/* ============ BOTTOM ACTION BUTTONS ============ */
+/* Push action buttons (like End Chat) to the bottom of the messages area */
+.cw-post-chat-actions {
+  margin-top: auto;
 }

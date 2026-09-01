@@ -2,10 +2,25 @@
    FAQ MODULE STYLES
    ============================================ */
 
+/* 
+  OPTIONAL: If your chat widget has a scrollable container,
+  give it a defined height and make it a flex column so the
+  FAQ content can fill the space and the button can be pushed down.
+  Replace `.cw-chat-scroll-area` with your actual parent class.
+*/
+.cw-chat-scroll-area {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* or a fixed height, e.g., 500px */
+  overflow-y: auto;
+}
+
+/* Main wrapper – now fills available height */
 .cw-faqlist-wrap {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 100%;
   animation: cw-msg-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -71,42 +86,90 @@
   color: var(--cw-gold-strong);
 }
 
-.cw-answer-box {
-  background: var(--cw-bg-soft);
-  border: 1px solid var(--cw-border);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-top: 4px;
-  animation: cw-msg-in 0.3s ease both;
+/* Disabled help button */
+.cw-help-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--cw-shadow-sm);
+}
+
+.cw-help-btn:disabled:hover {
+  transform: none;
+  box-shadow: var(--cw-shadow-sm);
+}
+
+/* ============ ACCORDION STYLES ============ */
+.cw-faq-accordion {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
-.cw-answer-box-header {
+.cw-faq-accordion-item {
+  background: var(--cw-surface);
+  border: 1px solid var(--cw-border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  box-shadow: var(--cw-shadow-sm);
+  animation: cw-msg-in 0.25s ease both;
+}
+
+.cw-faq-accordion-item--open {
+  border-color: var(--cw-gold-strong);
+  background: var(--cw-gold-tint);
+}
+
+.cw-faq-accordion-header {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
   font-size: 13px;
-  font-weight: 700;
-  color: var(--cw-primary);
-  border-bottom: 1px solid var(--cw-border);
-  padding-bottom: 8px;
+  font-weight: 500;
+  color: var(--cw-text);
+  transition: all 0.2s ease;
 }
 
-.cw-answer-box-header svg {
+.cw-faq-accordion-header:hover {
+  background: var(--cw-gold-tint);
+}
+
+.cw-faq-accordion-icon {
   color: var(--cw-gold-strong);
   flex-shrink: 0;
 }
 
-.cw-answer-empty {
-  font-size: 13px;
-  color: var(--cw-text-muted);
-  font-style: italic;
-  margin: 0;
+.cw-faq-accordion-question {
+  flex: 1;
+  font-weight: 500;
 }
 
-/* Article Styling inside FAQ answers */
+.cw-faq-accordion-chevron {
+  flex-shrink: 0;
+  color: var(--cw-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.cw-faq-accordion-chevron--open {
+  transform: rotate(180deg);
+  color: var(--cw-gold-strong);
+}
+
+.cw-faq-accordion-content {
+  padding: 0 14px 14px 36px;
+  animation: cw-msg-in 0.2s ease;
+  border-top: 1px solid var(--cw-border);
+  background: var(--cw-bg-soft);
+}
+
+/* Article styles inside accordion */
 .cw-article {
   font-size: 13.5px;
   line-height: 1.6;
@@ -183,25 +246,33 @@
   backdrop-filter: blur(4px);
 }
 
+/* ============ HELP BUTTON ============ */
 .cw-help-btn {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background: linear-gradient(135deg, var(--cw-primary-light) 0%, var(--cw-primary) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--cw-primary-light) 0%,
+    var(--cw-primary) 100%
+  );
   border: 1px solid var(--cw-gold-tint);
   border-radius: 12px;
   color: #fff;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-top: 6px;
-  box-shadow: var(--cw-shadow-sm);
+  margin-top: auto; /* push to bottom when content is short */
+  position: sticky; /* key: makes it stick to bottom while scrolling */
+  bottom: 0; /* stick at the bottom of the scroll container */
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1); /* subtle shadow when overlapping content */
+  z-index: 5; /* keep above accordion items */
 }
 
-.cw-help-btn:hover {
+.cw-help-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: var(--cw-shadow-md);
+  box-shadow: 0 6px 20px rgba(9, 59, 139, 0.4);
 }
 
 .cw-help-btn-icon {
@@ -223,6 +294,7 @@
   opacity: 0.8;
 }
 
+/* ============ SKELETON ============ */
 .cw-skeleton-list {
   display: flex;
   flex-direction: column;
@@ -243,5 +315,29 @@
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+/* ============ ANIMATIONS ============ */
+@keyframes cw-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 600px) {
+  .cw-faqlist-item,
+  .cw-faq-accordion-header {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  .cw-help-btn {
+    padding: 10px 12px;
   }
 }
