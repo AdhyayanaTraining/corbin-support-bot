@@ -97,6 +97,46 @@ class RequestQueryService {
     );
     return response.data;
   }
+
+  // =====================================================
+  // GET REQUEST QUERY BY REQUEST ID (custom ID)
+  // =====================================================
+
+  async getRequestQueryByRequestId(
+    request_id: string,
+  ): Promise<RequestQueryApiResponse> {
+    const response = await axiosClient.get(
+      `/get-request-query-by-request-id/${request_id}`,
+    );
+    return response.data;
+  }
+
+  // =====================================================
+  // GET REQUEST QUERIES BY EMAIL
+  // =====================================================
+
+  async getRequestQueriesByEmail(
+    email: string,
+  ): Promise<RequestQueriesApiResponse> {
+    const response = await axiosClient.get(
+      `/get-request-queries-by-email/${email}`,
+    );
+    return response.data;
+  }
+
+  // =====================================================
+  // GET REQUEST QUERY BY ANY FIELD (generic)
+  // =====================================================
+
+  async getRequestQueryByAny(
+    field: string,
+    value: string,
+  ): Promise<RequestQueryApiResponse | RequestQueriesApiResponse> {
+    const response = await axiosClient.get(`/get-request-query`, {
+      params: { field, value },
+    });
+    return response.data;
+  }
 }
 
 export default new RequestQueryService();

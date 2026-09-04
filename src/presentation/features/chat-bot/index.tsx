@@ -26,6 +26,7 @@ import {
   Loader2,
   Home,
   Folder,
+  MessageSquare,
 } from "lucide-react";
 import "highlight.js/styles/github.css";
 import "./style.css";
@@ -43,6 +44,8 @@ import {
   RequestQueryProvider,
   useRequestQuery,
 } from "@/src/application/request_a_query/RequestQueryContext";
+import RequestQueryService from "@/src/application/request_a_query/requestQuery.service";
+import type { RequestQuery } from "@/src/application/request_a_query/requestQuery.types";
 import { ChatProvider, useChat } from "@/src/application/live-chat/ChatContext";
 import { UserProvider, useUser } from "@/src/application/users/UserContext";
 import {
@@ -214,6 +217,7 @@ const getOrdinalSuffix = (n: number): string => {
 
 const CONTACT_STORAGE_KEY = "nimobot_contact_details";
 const FAQ_TOPIC_STORAGE_KEY = "nimobot_selected_faq_topic";
+const QUERY_STORAGE_KEY = "nimobot_submitted_queries"; // <-- added
 const LAUNCHER_SIZE = 84;
 
 // LauncherBotVideo - UNCHANGED
@@ -436,7 +440,9 @@ function ChatWidgetInner() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [flowStep, setFlowStep] = useState<FlowStep>("faq-list");
+  // ====== Extend FlowStep locally to include "my-queries" ======
+  type ExtendedFlowStep = FlowStep | "my-queries";
+  const [flowStep, setFlowStep] = useState<ExtendedFlowStep>("faq-list");
   const [selectedFAQ, setSelectedFAQ] = useState<FAQ | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FAQCategory | null>(
     null,
@@ -476,6 +482,10 @@ function ChatWidgetInner() {
   const [localValidationErrors, setLocalValidationErrors] =
     useState<ValidationErrors>({});
 
+  // ======================= NEW STATE =======================
+  const [userQueries, setUserQueries] = useState<RequestQuery[]>([]);
+  const [userQueriesLoading, setUserQueriesLoading] = useState(false);
+
   const t = useCallback(
     (key: keyof Translations): any => {
       const translate = getTranslation(selectedLanguage, key);
@@ -502,6 +512,23 @@ function ChatWidgetInner() {
     },
     [chatbotSettings.welcome_message],
   );
+
+  // ======================= NEW FUNCTION =======================
+  const fetchUserQueries = useCallback(async (email: string) => {
+    if (!email) return;
+    setUserQueriesLoading(true);
+    try {
+      const response =
+        await RequestQueryService.getRequestQueriesByEmail(email);
+      if (response?.data) {
+        setUserQueries(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching user queries:", error);
+    } finally {
+      setUserQueriesLoading(false);
+    }
+  }, []);
 
   // Language initialization with dynamic welcome message
   useEffect(() => {
@@ -549,10 +576,14 @@ function ChatWidgetInner() {
           setSavedContact(contact);
           if (contact.registered_employee_generated_id)
             getVisitorConversations(contact.registered_employee_generated_id);
+          // Fetch user queries on contact load
+          if (contact.email) {
+            fetchUserQueries(contact.email);
+          }
         }
       }
     } catch (err) {}
-  }, []);
+  }, [fetchUserQueries]);
 
   // Active topic/category storage
   useEffect(() => {
@@ -726,6 +757,11 @@ function ChatWidgetInner() {
 
             getVisitorConversations(result.registeredEmployeeId);
 
+            // Fetch user queries after contact saved
+            if (updated.email) {
+              fetchUserQueries(updated.email);
+            }
+
             if (result.isExistingUser && result.totalSessions) {
               const welcomeMsg = (t("welcomeBack") as (name: string) => string)(
                 result.data?.name || contact.name,
@@ -779,7 +815,14 @@ function ChatWidgetInner() {
     return () => {
       cancelled = true;
     };
-  }, [submitTrigger]);
+  }, [submitTrigger, fetchUserQueries]);
+
+  // Fetch user queries when the my-queries view is opened
+  useEffect(() => {
+    if (flowStep === "my-queries" && savedContact?.email) {
+      fetchUserQueries(savedContact.email);
+    }
+  }, [flowStep, savedContact, fetchUserQueries]);
 
   // Query submission trigger
   useEffect(() => {
@@ -792,6 +835,32 @@ function ChatWidgetInner() {
 
         if (result?.success) {
           const requestId = result?.request_id || result?.data?.request_id;
+
+          // Save query info to localStorage
+          try {
+            const storedQueries = JSON.parse(
+              window.localStorage.getItem(QUERY_STORAGE_KEY) || "[]",
+            );
+            storedQueries.push({
+              request_id: requestId,
+              query_title:
+                result?.data?.query_title || requestQuery.query_title,
+              category: result?.data?.category || requestQuery.category,
+              created_at: new Date().toISOString(),
+            });
+            window.localStorage.setItem(
+              QUERY_STORAGE_KEY,
+              JSON.stringify(storedQueries),
+            );
+          } catch (err) {
+            console.error("Failed to save query to localStorage", err);
+          }
+
+          // Refresh user queries after submission
+          const email = savedContact?.email || mentorForm.email;
+          if (email) {
+            fetchUserQueries(email);
+          }
 
           if (requestId) {
             pushMessage(
@@ -819,7 +888,8 @@ function ChatWidgetInner() {
     return () => {
       c = true;
     };
-  }, [querySubmitTrigger]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [querySubmitTrigger, savedContact, mentorForm.email, fetchUserQueries]);
 
   // Input handlers
   const handleNameInput = useCallback(
@@ -991,32 +1061,8 @@ function ChatWidgetInner() {
   }, []);
 
   const handleGoHome = useCallback(() => {
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    setIsTyping(false);
-    if (
-      flowStep === "mentor-chat" &&
-      selectedConversation?.conversation_generated_id
-    )
-      leaveRoom(selectedConversation.conversation_generated_id);
-    setFormError(null);
-    setLocalValidationErrors({});
-    if (savedContact) {
-      pushMessage("user", ts("switch_"));
-      simulateTyping(ts("sureHowToProceed"));
-      setFlowStep("mentor-options");
-    } else {
-      handleStart();
-    }
-  }, [
-    flowStep,
-    selectedConversation,
-    leaveRoom,
-    savedContact,
-    pushMessage,
-    simulateTyping,
-    handleStart,
-    ts,
-  ]);
+    handleStart();
+  }, [handleStart]);
 
   const handleBack = useCallback(() => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -1043,6 +1089,10 @@ function ChatWidgetInner() {
       pushMessage("user", ts("back"));
       simulateTyping(ts("howToProceed"));
     } else if (flowStep === "mentor-topics") {
+      setFlowStep("mentor-options");
+      pushMessage("user", ts("back"));
+      simulateTyping(ts("howToProceed"));
+    } else if (flowStep === "my-queries") {
       setFlowStep("mentor-options");
       pushMessage("user", ts("back"));
       simulateTyping(ts("howToProceed"));
@@ -1475,12 +1525,17 @@ function ChatWidgetInner() {
     setDraft("");
     setMessages([]);
     setShowLanguageSelector(true); // show language chooser next time
+    // Reset user queries state
+    setUserQueries([]);
+    setUserQueriesLoading(false);
 
     // Clear localStorage (contact, topic, language)
     try {
       window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
       window.localStorage.removeItem(CONTACT_STORAGE_KEY);
       window.localStorage.removeItem(FAQ_TOPIC_STORAGE_KEY);
+      window.localStorage.removeItem("nimobot_query_answered_ids");
+      window.localStorage.removeItem("nimobot_query_ids");
     } catch (err) {}
 
     // Reset all context states
@@ -1708,11 +1763,13 @@ function ChatWidgetInner() {
                       ? ts("talkToMentor")
                       : flowStep === "mentor-options"
                         ? ts("howCanWeHelp")
-                        : flowStep === "mentor-chat"
-                          ? (autoSelectedExpert?.name ??
-                            selectedConversation?.category_name ??
-                            ts("mentorChat"))
-                          : "Next Steps";
+                        : flowStep === "my-queries"
+                          ? "My Queries"
+                          : flowStep === "mentor-chat"
+                            ? (autoSelectedExpert?.name ??
+                              selectedConversation?.category_name ??
+                              ts("mentorChat"))
+                            : "Next Steps";
 
   const displayContact = savedContact ?? mentorForm;
   const showHomeButton =
@@ -1726,7 +1783,8 @@ function ChatWidgetInner() {
         "query-form",
         "mentor-resume-choice",
         "live-chat",
-      ] as FlowStep[]
+        "my-queries",
+      ] as ExtendedFlowStep[]
     ).includes(flowStep);
 
   const showFooterInput =
@@ -1761,7 +1819,6 @@ function ChatWidgetInner() {
                 </div>
                 <button
                   className="cw-header-close-language"
-                  // onClick={handleCloseLanguageSelector}
                   onClick={handleCloseChat}
                   type="button"
                   aria-label={ts("closeChat")}
@@ -1825,20 +1882,8 @@ function ChatWidgetInner() {
                     onSelect={handleLanguageSelect}
                     ts={ts}
                   />
-                  {showHomeButton && (
-                    <button
-                      className="cw-header-home-btn"
-                      onClick={handleGoHome}
-                      type="button"
-                      aria-label="Switch mode"
-                      title="Switch mode"
-                    >
-                      <Home size={16} />
-                    </button>
-                  )}
                   <button
                     className="cw-close-btn"
-                    // onClick={() => setIsOpen(false)}
                     onClick={handleCloseChat}
                     type="button"
                     aria-label={ts("closeChat")}
@@ -1868,7 +1913,7 @@ function ChatWidgetInner() {
               <div className="cw-messages" aria-live="polite">
                 {/* 1. FAQ Module */}
                 <FaqModule
-                  flowStep={flowStep}
+                  flowStep={flowStep as FlowStep}
                   faqsLoading={faqsLoading}
                   faqs={faqs}
                   selectedFAQ={selectedFAQ}
@@ -1889,7 +1934,7 @@ function ChatWidgetInner() {
 
                 {/* 2. Chat with Nemo Module */}
                 <ChatWithNemoModule
-                  flowStep={flowStep}
+                  flowStep={flowStep as FlowStep}
                   ts={ts}
                   t={t}
                   savedContact={savedContact}
@@ -1928,7 +1973,7 @@ function ChatWidgetInner() {
 
                 {/* 3. Raise a Query Module */}
                 <RaiseAQueryModule
-                  flowStep={flowStep}
+                  flowStep={flowStep as FlowStep}
                   ts={ts}
                   displayContact={displayContact}
                   requestQuery={requestQuery}
@@ -1946,6 +1991,51 @@ function ChatWidgetInner() {
                   isValidQueryTitle={isValidQueryTitle}
                   isValidQueryDescription={isValidQueryDescription}
                 />
+
+                {/* 4. My Queries Module */}
+                {flowStep === "my-queries" && (
+                  <div className="cw-my-queries-container">
+                    {userQueriesLoading ? (
+                      <div className="cw-loading">Loading your queries...</div>
+                    ) : userQueries.length === 0 ? (
+                      <div className="cw-empty-state">
+                        You have no queries in this session.
+                      </div>
+                    ) : (
+                      userQueries.map((q) => (
+                        <div
+                          key={q.request_query_generated_id}
+                          className="cw-query-card"
+                        >
+                          <div className="cw-query-card-header">
+                            <span className="cw-query-card-title">
+                              {q.query_title}
+                            </span>
+                            <span
+                              className={`cw-query-card-status status-${q.request_status?.toLowerCase()}`}
+                            >
+                              {q.request_status || "PENDING"}
+                            </span>
+                          </div>
+                          <div className="cw-query-card-meta">
+                            <span>ID: {q.request_id}</span>
+                            <span>{q.category}</span>
+                            <span>
+                              {q.requested_at
+                                ? new Date(q.requested_at).toLocaleDateString()
+                                : "N/A"}
+                            </span>
+                          </div>
+                          {q.resolution_note && (
+                            <div className="cw-query-card-response">
+                              <strong>Response:</strong> {q.resolution_note}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
               {showFooterInput && flowStep === "mentor-form" && (
@@ -1960,7 +2050,7 @@ function ChatWidgetInner() {
                   )}
                   <form className="cw-input-row" onSubmit={handleSend}>
                     <input
-                      key={mentorFormStep} // 👈 Add this line
+                      key={mentorFormStep}
                       className={`cw-input ${
                         formError || localValidationErrors[mentorFormStep]
                           ? "has-error"
@@ -2096,6 +2186,32 @@ function ChatWidgetInner() {
                     </form>
                   </div>
                 )}
+
+              {/* Bottom Navigation Bar */}
+              {savedContact && (
+                <div className="cw-bottom-nav">
+                  <button
+                    className={`cw-nav-btn ${flowStep !== "my-queries" ? "cw-nav-btn--active" : ""}`}
+                    onClick={handleStart} // go to FAQ
+                    title="Home"
+                  >
+                    <Home size={18} />
+                    <span>Home</span>
+                  </button>
+                  <button
+                    className={`cw-nav-btn ${flowStep === "my-queries" ? "cw-nav-btn--active" : ""}`}
+                    onClick={() => setFlowStep("my-queries")}
+                    title="My Queries"
+                  >
+                    <MessageSquare size={18} />
+                    <span>My Queries</span>
+                    {userQueries.length > 0 && (
+                      <span className="cw-nav-badge">{userQueries.length}</span>
+                    )}
+                  </button>
+                </div>
+              )}
+
               <div className="cw-footer-tag">{ts("poweredBy")}</div>
             </>
           )}
