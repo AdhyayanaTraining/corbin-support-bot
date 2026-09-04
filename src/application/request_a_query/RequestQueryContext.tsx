@@ -50,44 +50,30 @@ import {
 
 interface RequestQueryContextType {
   loading: boolean;
-
   requestQueries: RequestQuery[];
-
   requestQuery: CreateRequestQueryPayload;
-
   errors: RequestQueryValidationErrors;
-
   selectedRequestQuery: RequestQuery | null;
-
   setSelectedRequestQueryData: (requestQuery: RequestQuery) => void;
-
   handleChange: (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => void;
-
   resetForm: () => void;
-
-  addRequestQuery: () => Promise<boolean>;
-
+  addRequestQuery: () => Promise<any>;
   getRequestQueries: () => Promise<void>;
-
   getRequestQueryByGeneratedId: (
     request_query_generated_id: string,
   ) => Promise<void>;
-
-  getRequestQueriesByCategory: (category: string) => Promise<void>; // New method added
-
+  getRequestQueriesByCategory: (category: string) => Promise<void>;
   updateRequestQuery: () => Promise<boolean>;
-
   deleteRequestQuery: (request_query_generated_id: string) => Promise<boolean>;
-
   respondQuery: RespondToQueryPayload;
-
   respondErrors: RespondToQueryValidationErrors;
-
   setRespondQuery: React.Dispatch<React.SetStateAction<RespondToQueryPayload>>;
-
   respondToQuery: () => Promise<boolean>;
+  getRequestQueryByRequestId: (request_id: string) => Promise<void>;
+  getRequestQueriesByEmail: (email: string) => Promise<void>;
+  getRequestQueryByAny: (field: string, value: string) => Promise<void>;
 }
 
 // ======================================================
@@ -170,9 +156,7 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
   const resetForm = () => {
     setRequestQuery(EMPTY_REQUEST_QUERY);
-
     setErrors({});
-
     setSelectedRequestQuery(null);
   };
 
@@ -185,30 +169,19 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
     setRequestQuery({
       name: selected.name,
-
       email: selected.email,
-
       phone_number: selected.phone_number,
-
       query_title: selected.query_title,
-
       query_description: selected.query_description,
-
       screenshot_url: selected.screenshot_url ?? "",
-
-      category: selected.category ?? "", // Category field added
-
+      category: selected.category ?? "",
       assigned_to: selected.assigned_to ?? "",
-
       resolution_note: selected.resolution_note ?? "",
     });
 
     setErrors({});
   };
 
-  // ======================================================
-  // ADD REQUEST QUERY
-  // ======================================================
   // ======================================================
   // ADD REQUEST QUERY
   // ======================================================
@@ -233,7 +206,6 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
       await getRequestQueries();
       resetForm();
 
-      // Return the full response including request_id
       return {
         success: true,
         data: response.data,
@@ -254,9 +226,7 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
   const getRequestQueries = async (): Promise<void> => {
     try {
       setLoading(true);
-
       const response = await RequestQueryService.getRequestQueries();
-
       setRequestQueries(response.data || []);
     } catch (error) {
       console.error("Error fetching request queries:", error);
@@ -274,31 +244,21 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
   ): Promise<void> => {
     try {
       setLoading(true);
-
       const response = await RequestQueryService.getRequestQueryByGeneratedId(
         request_query_generated_id,
       );
 
       if (response.data) {
         setSelectedRequestQuery(response.data);
-
         setRequestQuery({
           name: response.data.name,
-
           email: response.data.email,
-
           phone_number: response.data.phone_number,
-
           query_title: response.data.query_title,
-
           query_description: response.data.query_description,
-
           screenshot_url: response.data.screenshot_url ?? "",
-
-          category: response.data.category ?? "", // Category field added
-
+          category: response.data.category ?? "",
           assigned_to: response.data.assigned_to ?? "",
-
           resolution_note: response.data.resolution_note ?? "",
         });
       }
@@ -310,7 +270,7 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ======================================================
-  // GET REQUEST QUERIES BY CATEGORY (NEW)
+  // GET REQUEST QUERIES BY CATEGORY
   // ======================================================
 
   const getRequestQueriesByCategory = async (
@@ -318,10 +278,8 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
   ): Promise<void> => {
     try {
       setLoading(true);
-
       const response =
         await RequestQueryService.getRequestQueriesByCategory(category);
-
       setRequestQueries(response.data || []);
     } catch (error) {
       console.error("Error fetching request queries by category:", error);
@@ -343,13 +301,11 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-
       return false;
     }
 
     try {
       setLoading(true);
-
       const payload: UpdateRequestQueryPayload = {
         ...requestQuery,
       };
@@ -360,13 +316,10 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
       );
 
       await getRequestQueries();
-
       resetForm();
-
       return true;
     } catch (error) {
       console.error("Error updating request query:", error);
-
       return false;
     } finally {
       setLoading(false);
@@ -382,7 +335,6 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
   ): Promise<boolean> => {
     try {
       setLoading(true);
-
       await RequestQueryService.deleteRequestQuery(request_query_generated_id);
 
       setRequestQueries((prev) =>
@@ -402,7 +354,6 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
       return true;
     } catch (error) {
       console.error("Error deleting request query:", error);
-
       return false;
     } finally {
       setLoading(false);
@@ -422,29 +373,113 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
     if (Object.keys(validationErrors).length > 0) {
       setRespondErrors(validationErrors);
-
       return false;
     }
 
     try {
       setLoading(true);
-
       await RequestQueryService.respondToQuery(
         selectedRequestQuery.request_query_generated_id!,
         respondQuery,
       );
 
       await getRequestQueries();
-
       setRespondQuery(EMPTY_RESPOND_TO_QUERY);
-
       setRespondErrors({});
-
       return true;
     } catch (error) {
       console.error("Error responding to query:", error);
-
       return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // GET REQUEST QUERY BY REQUEST ID
+  // ======================================================
+
+  const getRequestQueryByRequestId = async (
+    request_id: string,
+  ): Promise<void> => {
+    try {
+      setLoading(true);
+      const response =
+        await RequestQueryService.getRequestQueryByRequestId(request_id);
+      if (response.data) {
+        setSelectedRequestQuery(response.data);
+        setRequestQuery({
+          name: response.data.name,
+          email: response.data.email,
+          phone_number: response.data.phone_number,
+          query_title: response.data.query_title,
+          query_description: response.data.query_description,
+          screenshot_url: response.data.screenshot_url ?? "",
+          category: response.data.category ?? "",
+          assigned_to: response.data.assigned_to ?? "",
+          resolution_note: response.data.resolution_note ?? "",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching request query by request ID:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // GET REQUEST QUERIES BY EMAIL
+  // ======================================================
+
+  const getRequestQueriesByEmail = async (email: string): Promise<void> => {
+    try {
+      setLoading(true);
+      const response =
+        await RequestQueryService.getRequestQueriesByEmail(email);
+      setRequestQueries(response.data || []);
+    } catch (error) {
+      console.error("Error fetching request queries by email:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================================================
+  // GET REQUEST QUERY BY ANY FIELD (generic)
+  // ======================================================
+
+  const getRequestQueryByAny = async (
+    field: string,
+    value: string,
+  ): Promise<void> => {
+    try {
+      setLoading(true);
+      const response = await RequestQueryService.getRequestQueryByAny(
+        field,
+        value,
+      );
+
+      if ("data" in response) {
+        const data = response.data;
+        if (Array.isArray(data)) {
+          setRequestQueries(data);
+        } else if (data) {
+          setSelectedRequestQuery(data);
+          setRequestQuery({
+            name: data.name,
+            email: data.email,
+            phone_number: data.phone_number,
+            query_title: data.query_title,
+            query_description: data.query_description,
+            screenshot_url: data.screenshot_url ?? "",
+            category: data.category ?? "",
+            assigned_to: data.assigned_to ?? "",
+            resolution_note: data.resolution_note ?? "",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching request query by field:", error);
     } finally {
       setLoading(false);
     }
@@ -464,40 +499,26 @@ export const RequestQueryProvider = ({ children }: { children: ReactNode }) => {
 
   const value: RequestQueryContextType = {
     loading,
-
     requestQueries,
-
     requestQuery,
-
     errors,
-
     selectedRequestQuery,
-
     setSelectedRequestQueryData,
-
     handleChange,
-
     resetForm,
-
     addRequestQuery,
-
     getRequestQueries,
-
     getRequestQueryByGeneratedId,
-
-    getRequestQueriesByCategory, // New method added
-
+    getRequestQueriesByCategory,
     updateRequestQuery,
-
     deleteRequestQuery,
-
     respondQuery,
-
     respondErrors,
-
     setRespondQuery,
-
     respondToQuery,
+    getRequestQueryByRequestId,
+    getRequestQueriesByEmail,
+    getRequestQueryByAny,
   };
 
   // ======================================================
