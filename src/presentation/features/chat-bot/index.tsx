@@ -1893,23 +1893,23 @@ function ChatWidgetInner() {
                   </button>
                 </div>
               </div>
-              {activeCategory && (
+              /* {activeCategory && (
                 <div className="cw-topic-banner">
                   <span className="cw-topic-banner-label">
                     <Folder size={13} />
                     <span className="cw-topic-banner-text">
-                      {activeCategory.name}
-                    </span>
+                      {activeCategory.name} */
+                    {/* </span>
                   </span>
                   <button
                     type="button"
                     className="cw-topic-banner-change"
-                    onClick={handleChangeActiveTopic}
-                  >
+                    onClick={handleChangeActiveTopic} */}
+                  {/* >
                     {ts("change")}
                   </button>
                 </div>
-              )}
+              )} */}
               <div className="cw-messages" aria-live="polite">
                 {/* 1. FAQ Module */}
                 <FaqModule
