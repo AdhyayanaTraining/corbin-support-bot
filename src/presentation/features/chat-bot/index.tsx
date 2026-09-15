@@ -9,6 +9,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useMemo,
   FormEvent,
   ChangeEvent,
   useCallback,
@@ -502,6 +503,29 @@ function ChatWidgetInner() {
     [selectedLanguage],
   );
 
+  // ====================================================
+  // FAQ CATEGORIES FLATTENED
+  //
+  // Every category across every FAQ, deduplicated by
+  // id, used by the raise-a-query "change topic" picker.
+  // ====================================================
+
+  const faqCategories: FAQCategory[] = useMemo(() => {
+    const seen = new Set<string>();
+    const out: FAQCategory[] = [];
+
+    for (const f of faqs) {
+      for (const c of f.categories || []) {
+        if (!c.category_generated_id) continue;
+        if (seen.has(c.category_generated_id)) continue;
+        seen.add(c.category_generated_id);
+        out.push(c);
+      }
+    }
+
+    return out;
+  }, [faqs]);
+
   // Helper function to get welcome message
   const getWelcomeMessage = useCallback(
     (language?: string): string => {
@@ -612,6 +636,106 @@ function ChatWidgetInner() {
     setSelectedQuestion(null);
     setFlowStep("faq-categories");
   }, [showLanguageSelector, faqsLoading, flowStep, selectedFAQ, faqs]);
+
+  // ====================================================
+  // RE-SYNC SELECTED FAQ / CATEGORY / QUESTION
+  //
+  // `faqs` is refreshed by FAQProvider whenever the
+  // socket emits "faq:updated". The locally held
+  // selected objects are stale snapshots — this effect
+  // re-derives them from the fresh list so the UI
+  // always reflects the latest server state.
+  // ====================================================
+
+  useEffect(() => {
+    // -------- Re-sync selected FAQ --------
+    if (selectedFAQ?.faq_generated_id) {
+      const freshFAQ = faqs.find(
+        (f) => f.faq_generated_id === selectedFAQ.faq_generated_id,
+      );
+
+      if (!freshFAQ) {
+        setSelectedFAQ(null);
+        setSelectedCategory(null);
+        setSelectedQuestion(null);
+        setFlowStep("faq-list");
+        return;
+      }
+
+      if (freshFAQ !== selectedFAQ) {
+        setSelectedFAQ(freshFAQ);
+      }
+    }
+
+    // -------- Re-sync selected Category --------
+    if (
+      selectedFAQ?.faq_generated_id &&
+      selectedCategory?.category_generated_id
+    ) {
+      const freshFAQ = faqs.find(
+        (f) => f.faq_generated_id === selectedFAQ.faq_generated_id,
+      );
+
+      const freshCategory = freshFAQ?.categories?.find(
+        (c) =>
+          c.category_generated_id === selectedCategory.category_generated_id,
+      );
+
+      if (!freshCategory) {
+        setSelectedCategory(null);
+        setSelectedQuestion(null);
+        setFlowStep("faq-categories");
+        return;
+      }
+
+      if (freshCategory !== selectedCategory) {
+        setSelectedCategory(freshCategory);
+      }
+    }
+
+    // -------- Re-sync selected Question --------
+    if (
+      selectedCategory?.category_generated_id &&
+      selectedQuestion?.question_generated_id
+    ) {
+      const freshCategory = faqs
+        .find((f) => f.faq_generated_id === selectedFAQ?.faq_generated_id)
+        ?.categories?.find(
+          (c) =>
+            c.category_generated_id === selectedCategory.category_generated_id,
+        );
+
+      const freshQuestion = freshCategory?.questions?.find(
+        (q) =>
+          q.question_generated_id === selectedQuestion.question_generated_id,
+      );
+
+      if (!freshQuestion) {
+        setSelectedQuestion(null);
+        return;
+      }
+
+      if (freshQuestion !== selectedQuestion) {
+        setSelectedQuestion(freshQuestion);
+      }
+    }
+
+    // -------- Re-sync activeCategory (localStorage) --------
+    if (activeCategory?.id) {
+      const stillExists = faqs.some((f) =>
+        (f.categories || []).some(
+          (c) => c.category_generated_id === activeCategory.id,
+        ),
+      );
+
+      if (!stillExists) {
+        setActiveCategory(null);
+        try {
+          window.localStorage.removeItem(FAQ_TOPIC_STORAGE_KEY);
+        } catch (err) {}
+      }
+    }
+  }, [faqs]);
 
   // Conversation management
   useEffect(() => {
@@ -1432,26 +1556,42 @@ function ChatWidgetInner() {
     ts,
   ]);
 
-  const handleOpenQueryCategoryChange = useCallback(async () => {
+  // ====================================================
+  // OPEN QUERY CATEGORY PICKER
+  //
+  // Now purely local — FAQ categories are already in
+  // memory, no need to fetch expert categories.
+  // ====================================================
+
+  const handleOpenQueryCategoryChange = useCallback(() => {
     setLocalValidationErrors({});
-    try {
-      await getExpertCategories();
-    } catch (err) {}
     setFlowStep("query-category");
-  }, [getExpertCategories]);
+  }, []);
+
+  // ====================================================
+  // SELECT QUERY CATEGORY
+  //
+  // Receives an FAQCategory now. Resolves the localized
+  // topic name and writes it into requestQuery.category.
+  // ====================================================
 
   const handleQueryCategorySelect = useCallback(
-    (cat: ExpertCategory) => {
+    (cat: FAQCategory) => {
+      const topicName =
+        getLocalizedText(cat.topic_name, selectedLanguage || "en") || "";
+
       handleRequestQueryChange({
-        target: { name: "category", value: cat.name },
+        target: { name: "category", value: topicName },
       } as ChangeEvent<HTMLInputElement>);
+
       setLocalValidationErrors((prev) => {
         const { category, ...rest } = prev;
         return rest;
       });
+
       setFlowStep("query-form");
     },
-    [handleRequestQueryChange],
+    [handleRequestQueryChange, getLocalizedText, selectedLanguage],
   );
 
   const handleSkipQueryCategory = useCallback(() => {
@@ -1893,7 +2033,7 @@ function ChatWidgetInner() {
                   </button>
                 </div>
               </div>
-           
+
               <div className="cw-messages" aria-live="polite">
                 {/* 1. FAQ Module */}
                 <FaqModule
@@ -1964,8 +2104,9 @@ function ChatWidgetInner() {
                   requestQueryErrors={requestQueryErrors}
                   localValidationErrors={localValidationErrors}
                   requestQueryLoading={requestQueryLoading}
-                  expertCategories={expertCategories}
-                  expertsLoading={expertsLoading}
+                  faqCategories={faqCategories}
+                  selectedLanguage={selectedLanguage || "en"}
+                  getLocalizedText={getLocalizedText}
                   onOpenQueryCategoryChange={handleOpenQueryCategoryChange}
                   onQueryCategorySelect={handleQueryCategorySelect}
                   onSkipQueryCategory={handleSkipQueryCategory}

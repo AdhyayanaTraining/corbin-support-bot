@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/immutability */
 
 "use client";
@@ -20,6 +21,12 @@ import {
 // ======================================================
 
 import FAQService from "./faq.service";
+
+// ======================================================
+// Socket
+// ======================================================
+
+import { getSocketClient } from "./faq.socket";
 
 // ======================================================
 // Types
@@ -337,6 +344,60 @@ export const FAQProvider = ({ children }: { children: ReactNode }) => {
       getFAQByGeneratedId(selectedFAQ.faq_generated_id);
     }
   }, [language]);
+
+  // ====================================================
+  // SOCKET: LISTEN FOR FAQ UPDATES
+  //
+  // When ANY admin (this tab, another tab, another
+  // browser, another machine) creates, updates or
+  // deletes an FAQ, the backend emits "faq:updated".
+  //
+  // We refresh:
+  //   1. the full FAQ list
+  //   2. the currently opened FAQ (if it matches)
+  // ====================================================
+
+  useEffect(() => {
+    const socket = getSocketClient();
+
+    const handleFAQUpdate = (payload: {
+      action: string;
+      timestamp: string;
+      faq_generated_id?: string;
+      category_generated_id?: string;
+      question_generated_id?: string;
+      answer_generated_id?: string;
+    }) => {
+      console.log("[FAQ socket] received:", payload);
+
+      // ==================================================
+      // ALWAYS REFRESH THE FULL LIST
+      // ==================================================
+
+      getAllFAQs();
+
+      // ==================================================
+      // REFRESH THE CURRENTLY OPEN FAQ (IF ANY)
+      //
+      // Skip if the update was for a different FAQ
+      // entirely — the list refresh above is enough.
+      // ==================================================
+
+      if (
+        selectedFAQ?.faq_generated_id &&
+        (!payload.faq_generated_id ||
+          payload.faq_generated_id === selectedFAQ.faq_generated_id)
+      ) {
+        getFAQByGeneratedId(selectedFAQ.faq_generated_id);
+      }
+    };
+
+    socket.on("faq:updated", handleFAQUpdate);
+
+    return () => {
+      socket.off("faq:updated", handleFAQUpdate);
+    };
+  }, [selectedFAQ?.faq_generated_id, language]);
 
   // ====================================================
   // HANDLE FAQ INPUT CHANGE
