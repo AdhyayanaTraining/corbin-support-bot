@@ -8,7 +8,7 @@ import {
   ClipboardList,
   Loader2,
 } from "lucide-react";
-import type { ExpertCategory } from "@/src/application/users/user.types";
+import type { FAQCategory } from "@/src/application/faq/faq.types";
 import type {
   FlowStep,
   ContactDetails,
@@ -25,10 +25,20 @@ interface RaiseAQueryModuleProps {
   requestQueryErrors: ValidationErrors;
   localValidationErrors: ValidationErrors;
   requestQueryLoading: boolean;
-  expertCategories: ExpertCategory[];
-  expertsLoading: boolean;
+
+  // ====================================================
+  // FAQ CATEGORIES
+  //
+  // Now sourced from the FAQ knowledge base, not from
+  // expert/mentor categories. This lets the user pick
+  // from the same topics they saw in the FAQ flow.
+  // ====================================================
+  faqCategories: FAQCategory[];
+  selectedLanguage: string;
+  getLocalizedText: (value: any, language: string) => string;
+
   onOpenQueryCategoryChange: () => void;
-  onQueryCategorySelect: (cat: ExpertCategory) => void;
+  onQueryCategorySelect: (cat: FAQCategory) => void;
   onSkipQueryCategory: () => void;
   onRequestQueryChange: (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -49,8 +59,9 @@ export function RaiseAQueryModule({
   requestQueryErrors,
   localValidationErrors,
   requestQueryLoading,
-  expertCategories,
-  expertsLoading,
+  faqCategories,
+  selectedLanguage,
+  getLocalizedText,
   onOpenQueryCategoryChange,
   onQueryCategorySelect,
   onSkipQueryCategory,
@@ -60,6 +71,14 @@ export function RaiseAQueryModule({
   isValidQueryTitle,
   isValidQueryDescription,
 }: RaiseAQueryModuleProps) {
+  // ====================================================
+  // QUERY CATEGORY PICKER
+  //
+  // Shows every FAQ topic — the same list the user sees
+  // in the FAQ flow. If a topic has multiple FAQ parents
+  // it will appear once (dedup happens in the parent).
+  // ====================================================
+
   if (flowStep === "query-category") {
     return (
       <div className="cw-categories-wrap">
@@ -69,34 +88,34 @@ export function RaiseAQueryModule({
           </span>
           {ts("whichCategoryQuery")}
         </div>
-        {expertsLoading && (
-          <div className="cw-skeleton-list">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="cw-skeleton-card" />
-            ))}
-          </div>
-        )}
-        {!expertsLoading && expertCategories.length === 0 && (
+
+        {faqCategories.length === 0 ? (
           <div className="cw-empty-state">No categories available.</div>
-        )}
-        {!expertsLoading && expertCategories.length > 0 && (
+        ) : (
           <div className="cw-categories-grid">
-            {expertCategories.map((cat, i) => (
-              <button
-                key={cat.category_generated_id ?? i}
-                className="cw-category-card"
-                style={{ animationDelay: `${i * 0.06}s` }}
-                onClick={() => onQueryCategorySelect(cat)}
-                type="button"
-              >
-                <span className="cw-category-icon">
-                  <ClipboardList size={18} />
-                </span>
-                <span className="cw-category-name">{cat.name}</span>
-              </button>
-            ))}
+            {faqCategories.map((cat, i) => {
+              const topicName =
+                getLocalizedText(cat.topic_name, selectedLanguage || "en") ||
+                ts("unknown");
+
+              return (
+                <button
+                  key={cat.category_generated_id ?? i}
+                  className="cw-category-card"
+                  style={{ animationDelay: `${i * 0.06}s` }}
+                  onClick={() => onQueryCategorySelect(cat)}
+                  type="button"
+                >
+                  <span className="cw-category-icon">
+                    <ClipboardList size={18} />
+                  </span>
+                  <span className="cw-category-name">{topicName}</span>
+                </button>
+              );
+            })}
           </div>
         )}
+
         <button
           className="cw-skip-category-btn"
           onClick={onSkipQueryCategory}
@@ -107,6 +126,10 @@ export function RaiseAQueryModule({
       </div>
     );
   }
+
+  // ====================================================
+  // QUERY FORM
+  // ====================================================
 
   if (flowStep === "query-form") {
     return (
@@ -121,6 +144,7 @@ export function RaiseAQueryModule({
             <span>{displayContact.email}</span>
           </div>
         </div>
+
         {requestQuery.category && (
           <div className="cw-query-category-badge">
             <ClipboardList size={12} />
@@ -134,6 +158,7 @@ export function RaiseAQueryModule({
             </button>
           </div>
         )}
+
         <form className="cw-query-form" onSubmit={onSubmitQuery}>
           <div className="cw-query-field">
             <label className="cw-query-label">
@@ -179,6 +204,7 @@ export function RaiseAQueryModule({
               </span>
             )}
           </div>
+
           <div className="cw-query-field">
             <label className="cw-query-label">
               <FileText size={13} />
@@ -223,11 +249,13 @@ export function RaiseAQueryModule({
               </span>
             )}
           </div>
+
           {localValidationErrors.category && (
             <span className="cw-query-error">
               {localValidationErrors.category}
             </span>
           )}
+
           <button
             type="submit"
             className="cw-query-submit-btn"

@@ -94,7 +94,7 @@ export function FaqModule({
               .filter((f) => f.isActiveFAQ)
               .map((faq, i) => (
                 <button
-                  key={faq.faq_generated_id || i}
+                  key={faq.faq_generated_id}
                   className="cw-faqlist-item"
                   style={{ animationDelay: `${i * 0.05}s` }}
                   onClick={() => onFaqSelect(faq)}
@@ -143,7 +143,7 @@ export function FaqModule({
           <div className="cw-faqlist-items">
             {cats.map((cat, i) => (
               <button
-                key={cat.category_generated_id || i}
+                key={cat.category_generated_id}
                 className={`cw-faqlist-item ${
                   activeCategory?.id &&
                   cat.category_generated_id &&
@@ -206,7 +206,7 @@ export function FaqModule({
 
               return (
                 <div
-                  key={q.question_generated_id || i}
+                  key={q.question_generated_id}
                   className={`cw-faq-accordion-item ${
                     isOpen ? "cw-faq-accordion-item--open" : ""
                   }`}
@@ -260,7 +260,12 @@ export function FaqModule({
                                   >
                                     <img
                                       src={block.image_url}
-                                      alt={`Illustration ${bi + 1}`}
+                                      alt={
+                                        getLocalizedText(
+                                          q.question_text,
+                                          selectedLanguage || "en",
+                                        ) || `Illustration ${bi + 1}`
+                                      }
                                       className="cw-article-image"
                                       loading="lazy"
                                     />
